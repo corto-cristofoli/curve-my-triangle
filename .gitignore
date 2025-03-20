@@ -4,4 +4,4 @@ cmake_install.cmake
 compile_commands.json
 Makefile
 texput.log
-main
+build

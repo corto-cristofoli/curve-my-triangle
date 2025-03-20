@@ -2,6 +2,8 @@
 CGDI project with Max Royer based on the article *Curved PN Triangles* by Alex VLACHOS, Jörg PETERS, Chas BOYD
 and Jason L. MITCHELL.
 
+**TO COMPILE** : `cmake -B build`
+
 ## Goal
 - The idea of the project is to take a 3d *lowpoly* mesh and to apply a technique called **curved PN triangles
 tesselation** to smooth the mesh and make it more organic.
