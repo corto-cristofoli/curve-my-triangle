@@ -5,3 +5,5 @@ compile_commands.json
 Makefile
 texput.log
 build
+.polyscope.ini
+imgui.ini

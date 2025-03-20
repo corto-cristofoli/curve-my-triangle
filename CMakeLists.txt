@@ -23,5 +23,6 @@ file(GLOB CCP_SOURCE
     "${PROJECT_SOURCE_DIR}/src/*/*.cpp"
 )
 
+add_subdirectory(src)
 # add_executable(main CCP_SOURCE)
 # target_link_libraries(main polyscope geometry-central)
