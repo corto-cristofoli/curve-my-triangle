@@ -7,3 +7,4 @@ texput.log
 build
 .polyscope.ini
 imgui.ini
+.cache
