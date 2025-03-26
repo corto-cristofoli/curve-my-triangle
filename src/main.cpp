@@ -1,16 +1,17 @@
 // #include "geometrycentral/surface/base_geometry_interface.h"
 // #include "geometrycentral/numerical/linear_algebra_types.h"
-#include "geometrycentral/surface/direction_fields.h"
+// #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
-#include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
+// #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 
+#include "geometrycentral/utilities/vector2.h"
 #include "geometrycentral/utilities/vector3.h"
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include <Eigen/src/SparseCore/SparseUtil.h>
-#include <fstream>
+// #include <fstream>
 #include <memory>
 #include <string>
 // #include <vector>
@@ -66,9 +67,11 @@ std::vector<Vertex> get_vertices(Face face) {
   return P;
 }
 
+// ## MAIN FUNCTIONS #########################
+
 std::vector<Vector3> get_control_points(Face face) {
-  // Get the positions of all the control points of a face.
-  // For now it is only with lod = 2 like in the 3.1 section
+  // Get the positions of all the bezier control points of a face.
+  // With those control points b, we can then apply
   /*
    Return the points in the order:
    T := {b_012,
@@ -127,7 +130,32 @@ std::vector<Vector3> get_control_points(Face face) {
   return T;
 }
 
-void set_pn_triangle(Face face) {
+Vector3 get_point_position(double u, double v, std::vector<Vector3> cpoints){
+  // TODO : return position of point (u,v) in a face controlled by cpoints
+  Vector3 p{0.0,0.0,0.0};
+  return p;
+}
+
+std::vector<Vector2> get_discretized_face(int lod){
+  // return local (barycentric position) (u,v) position
+  // of new vertices of a face
+  double step = 1./(lod+1);
+  std::vector<Vector2> positions;
+
+  for (int i=0; i<=lod; i++) {
+    for (int j=0; j<=lod; j++) {
+      if ((i==0 && j==0) || (i+j>lod+1)) continue; // we don't want to add corner
+      positions.push_back( Vector2{i*step, j*step} );
+    }
+  }
+  // for (int k=0; k<positions.size(); k++) {
+  //   std::cout << positions[k] << std::endl;
+  // }
+  // std::cout << positions.size() << std::endl;
+  return positions;
+}
+
+void set_pn_triangle(Face face, int lod, std::unordered_set<Vector3> seens_points) {
   // transform a triangle face into a curved pn triangle
   // TODO: just inserting new point on the original face doesn't work
   std::vector<Vector3> T = get_control_points(face);
@@ -206,14 +234,14 @@ int main(int argc, char **argv) {
 
   geometry->requireFaceAreas(); // get area by using geometry->faceAreas[f]
                                 // where f is the face
-  geometry
-      ->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
-                              // where f is the face
+  geometry->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
+                                  // where f is the face
   geometry->requireVertexNormals();
 
-  for (auto face : mesh->faces()) {
-    set_pn_triangle(face);
-  }
+  // for (auto face : mesh->faces()) {
+  //   set_pn_triangle(face,);
+  // }
+
 
   // Register the mesh with polyscope
   auto o_obj = polyscope::registerSurfaceMesh(
