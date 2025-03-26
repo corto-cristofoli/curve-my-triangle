@@ -1,2 +1,5 @@
 build
+CMakeFiles
+imgui.ini
+.polyscope.ini
 .cache
