@@ -14,6 +14,8 @@
 // #include <fstream>
 #include <memory>
 #include <string>
+#include <unordered_set>
+#include <vector>
 // #include <vector>
 // #include "polyscope/point_cloud.h"
 
@@ -130,22 +132,23 @@ std::vector<Vector3> get_control_points(Face face) {
   return T;
 }
 
-Vector3 get_point_position(double u, double v, std::vector<Vector3> cpoints){
+Vector3 get_point_position(double u, double v, std::vector<Vector3> cpoints) {
   // TODO : return position of point (u,v) in a face controlled by cpoints
-  Vector3 p{0.0,0.0,0.0};
+  Vector3 p{0.0, 0.0, 0.0};
   return p;
 }
 
-std::vector<Vector2> get_discretized_face(int lod){
+std::vector<Vector2> get_discretized_face(int lod) {
   // return local (barycentric position) (u,v) position
   // of new vertices of a face
-  double step = 1./(lod+1);
+  double step = 1. / (lod + 1);
   std::vector<Vector2> positions;
 
-  for (int i=0; i<=lod; i++) {
-    for (int j=0; j<=lod; j++) {
-      if ((i==0 && j==0) || (i+j>lod+1)) continue; // we don't want to add corner
-      positions.push_back( Vector2{i*step, j*step} );
+  for (int i = 0; i <= lod; i++) {
+    for (int j = 0; j <= lod; j++) {
+      if ((i == 0 && j == 0) || (i + j > lod + 1))
+        continue; // we don't want to add corner
+      positions.push_back(Vector2{i * step, j * step});
     }
   }
   // for (int k=0; k<positions.size(); k++) {
@@ -155,11 +158,21 @@ std::vector<Vector2> get_discretized_face(int lod){
   return positions;
 }
 
-void set_pn_triangle(Face face, int lod, std::unordered_set<Vector3> seens_points) {
+void set_pn_triangle(Face face, std::unordered_set<Vector3> seen_points,
+                     int lod) {
   // transform a triangle face into a curved pn triangle
   // TODO: just inserting new point on the original face doesn't work
   std::vector<Vector3> T = get_control_points(face);
   std::vector<Vertex> P = get_vertices(face);
+
+  for (Vector3 cp : T) {
+    auto it = seen_points.find(cp);
+    if (it == seen_points.end()) {
+      seen_points.insert(cp);
+      Vertex center_point = mesh->insertVertex(face);
+      geometry->vertexPositions[center_point.getIndex()] = cp;
+    }
+  }
 
   // int first_index, second_index;
   //
@@ -172,7 +185,6 @@ void set_pn_triangle(Face face, int lod, std::unordered_set<Vector3> seens_point
   //       break;
   //     }
   //   }
-  //   Halfedge he = mesh->insertVertexAlongEdge(edge_to_add);
   //   if (i == 0) {
   //     first_index = 5;
   //   } else if (i == 1) {
@@ -180,17 +192,47 @@ void set_pn_triangle(Face face, int lod, std::unordered_set<Vector3> seens_point
   //   } else {
   //     first_index = 2;
   //   }
-  //   geometry->vertexPositions[he.vertex().getIndex()] = T[first_index];
-  //   for (Edge ep : he.vertex().adjacentEdges()) {
-  //     if (ep.otherVertex(he.vertex()) == P[(i + 1) % 3]) {
-  //       Halfedge hep = mesh->insertVertexAlongEdge(ep);
-  //       if (i == 0) {
-  //         second_index = 3;
-  //       } else if (i == 1) {
-  //         second_index = 0;
-  //       } else {
-  //         second_index = 4;
+  //   auto it = seen_points.find(T[first_index]);
+  //
+  //   if (it == seen_points.end()) {
+  //     // It means that the point is not already in the surface mesh
+  //     seen_points.insert(T[first_index]);
+  //     Halfedge he = mesh->insertVertexAlongEdge(edge_to_add);
+  //     geometry->vertexPositions[he.vertex().getIndex()] = T[first_index];
+  //     for (Edge ep : he.vertex().adjacentEdges()) {
+  //       if (ep.otherVertex(he.vertex()) == P[(i + 1) % 3]) {
+  //         if (i == 0) {
+  //           second_index = 3;
+  //         } else if (i == 1) {
+  //           second_index = 0;
+  //         } else {
+  //           second_index = 4;
+  //         }
+  //         auto it = seen_points.find(T[second_index]);
+  //
+  //         if (it == seen_points.end()) {
+  //           // It means that the point is not already in the surface mesh
+  //           seen_points.insert(T[second_index]);
+  //           Halfedge hep = mesh->insertVertexAlongEdge(ep);
+  //           geometry->vertexPositions[hep.vertex().getIndex()] =
+  //               T[second_index];
+  //         }
   //       }
+  //     }
+  //   } else {
+  //     if (i == 0) {
+  //       second_index = 3;
+  //     } else if (i == 1) {
+  //       second_index = 0;
+  //     } else {
+  //       second_index = 4;
+  //     }
+  //     auto it = seen_points.find(T[second_index]);
+  //
+  //     if (it == seen_points.end()) {
+  //       // It means that the point is not already in the surface mesh
+  //       seen_points.insert(T[second_index]);
+  //       Halfedge hep = mesh->insertVertexAlongEdge(edge_to_add);
   //       geometry->vertexPositions[hep.vertex().getIndex()] = T[second_index];
   //     }
   //   }
@@ -209,8 +251,9 @@ void set_pn_triangle(Face face, int lod, std::unordered_set<Vector3> seens_point
   //   geometry->vertexPositions[new_point] = T[first_index];
   // }
 
-  Vertex center_point = mesh->insertVertex(face);
-  geometry->vertexPositions[center_point.getIndex()] = T[6];
+  // Vertex center_point = mesh->insertVertex(face);
+  // geometry->vertexPositions[center_point.getIndex()] = T[6];
+  mesh->triangulate(face);
 }
 
 // == MAIN
@@ -234,14 +277,15 @@ int main(int argc, char **argv) {
 
   geometry->requireFaceAreas(); // get area by using geometry->faceAreas[f]
                                 // where f is the face
-  geometry->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
-                                  // where f is the face
+  geometry
+      ->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
+                              // where f is the face
   geometry->requireVertexNormals();
 
-  // for (auto face : mesh->faces()) {
-  //   set_pn_triangle(face,);
-  // }
-
+  std::unordered_set<Vector3> seen_points;
+  for (auto face : mesh->faces()) {
+    set_pn_triangle(face, seen_points, 0);
+  }
 
   // Register the mesh with polyscope
   auto o_obj = polyscope::registerSurfaceMesh(
