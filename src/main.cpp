@@ -12,6 +12,7 @@
 #include "polyscope/surface_mesh.h"
 #include <Eigen/src/SparseCore/SparseUtil.h>
 // #include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -28,6 +29,41 @@ std::unique_ptr<VertexPositionGeometry> geometry;
 
 std::unique_ptr<ManifoldSurfaceMesh> meshOut;
 std::unique_ptr<VertexPositionGeometry> geometryOut;
+
+typedef std::map<std::string, Vector3> BezierTile;
+
+class Obj {
+public:
+  std::map<Vector3, int> index_vertices;
+  int nb_points;
+  std::vector<Vector3> vertices;
+  std::vector<std::array<int, 3>> faces;
+  Obj() { nb_points = 0; }
+  void add_vertex(Vector3 v) {
+    auto it = index_vertices.find(v);
+    if (it == index_vertices.end()) {
+      index_vertices.insert({v, nb_points});
+      vertices.push_back(v);
+      nb_points++;
+    }
+  }
+  int get_index(Vector3 v) {
+    auto it = index_vertices.find(v);
+    if (it == index_vertices.end()) {
+      add_vertex(v);
+      return nb_points - 1;
+    } else {
+      return it->second;
+    }
+  }
+  void add_face(std::array<Vector3, 3> f) {
+    std::array<int, 3> new_f;
+    for (int i = 0; i < 3; i++) {
+      new_f[i] = get_index(f[i]);
+    }
+    faces.push_back(new_f);
+  }
+};
 
 // == ALGORITHM FUNCTIONS
 
@@ -57,12 +93,8 @@ std::vector<Vertex> shift_indices(std::vector<Vertex> P, int shifting) {
 std::vector<Vertex> get_vertices(Face face) {
   // Method to get vertices in consistent order for a face
   std::vector<Vertex> P;
-  auto currentHE = face.halfedge();
-  Vertex startVertex = currentHE.vertex();
-  P.push_back(startVertex);
-  while (currentHE.next().vertex() != startVertex) {
-    P.push_back(currentHE.next().vertex());
-    currentHE = currentHE.next();
+  for (Vertex v : face.adjacentVertices()) {
+    P.push_back(v);
   }
   int argmin = argmin_index(P);
   P = shift_indices(P, argmin);
@@ -71,84 +103,84 @@ std::vector<Vertex> get_vertices(Face face) {
 
 // ## MAIN FUNCTIONS #########################
 
-std::vector<Vector3> get_control_points(Face face) {
+BezierTile get_bezier_tile(Face face) {
   // Get the positions of all the bezier control points of a face.
   // With those control points b, we can then apply
-  /*
-   Return the points in the order:
-   T := {b_012,
-    b_021,
-    b_102,
-    b_120,
-    b_201,
-    b_210,
-    b_111}
-   */
+
+  BezierTile B;
   std::vector<Vertex> P = get_vertices(face);
-  std::vector<Vector3> T; // tangent coefficient points
-  int min_id, max_id;
   Vector3 V{0.0, 0.0, 0.0}; // barycenter of the face
+  int max_id, min_id;
+  Vector3 E{0.0, 0.0, 0.0};
+  for (int i = 0; i <= 3; i++) {
+    for (int j = 0; j <= 3 - i; j++) {
+      int k = 3 - i - j;
+      if (i == 3) {
+        B.insert({"300", geometry->vertexPositions[P[0]]});
+      } else if (j == 3) {
+        B.insert({"030", geometry->vertexPositions[P[1]]});
+      } else if (k == 3) {
+        B.insert({"003", geometry->vertexPositions[P[2]]});
+      }
+      if (i == j) {
+        continue;
+      } else if (i == 1) {
+        min_id = 0;
+      } else if (j == 1) {
+        min_id = 1;
+      } else if (k == 1) {
+        min_id = 2;
+      }
+      if (i == 2) {
+        max_id = 0;
+      } else if (j == 2) {
+        max_id = 1;
+      } else if (k == 2) {
+        max_id = 2;
+      }
+      Vector3 Pmax = geometry->vertexPositions[P[max_id]];
+      Vector3 Pmin = geometry->vertexPositions[P[min_id]];
+
+      Vector3 N = geometry->vertexNormals[P[max_id]];
+      double w = dot(Pmin - Pmax, N);
+      Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
+      E += b;
+      B.insert({std::to_string(i * 100 + j * 10 + k), b});
+    }
+  }
   for (Vertex p : P) {
     V += geometry->vertexPositions[p];
   }
   V /= 3;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
-        if (i <= 2 && j <= 2 && k <= 2 && i + j + k == 3) {
-          if (i == 1 && j == 1 && k == 1)
-            continue; // we handle b_{111} after
-          if (i == 2)
-            max_id = 0;
-          else if (j == 2)
-            max_id = 1;
-          else
-            max_id = 2;
-
-          if (i == 1)
-            min_id = 0;
-          else if (j == 1)
-            min_id = 1;
-          else
-            min_id = 2;
-          Vector3 Pmax = geometry->vertexPositions[P[max_id]];
-          Vector3 Pmin = geometry->vertexPositions[P[min_id]];
-
-          Vector3 N = geometry->vertexNormals[P[max_id]];
-          double w = dot(Pmin - Pmax, N);
-          Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
-          T.push_back(b);
-          std::cout << i << j << k << "\n";
-        }
-      }
-    }
-  }
-  Vector3 E{0.0, 0.0, 0.0};
-  for (Vector3 pos : T) {
-    E += pos;
-  }
   E /= 6;
-  T.push_back(E + ((E - V) / 2));
-  return T;
+  B.insert({"111", E + ((E - V) / 2)});
+  return B;
 }
 
-Vector3 get_point_position(double u, double v, std::vector<Vector3> cpoints) {
-  // TODO : return position of point (u,v) in a face controlled by cpoints
-  Vector3 p{0.0, 0.0, 0.0};
-  return p;
+Vector3 get_point_position(double u, double v, BezierTile B) {
+  double w = 1 - u - v;
+  return std::pow(w, 3) * B["300"] + std::pow(u, 3) * B["030"] +
+         std::pow(v, 3) * B["003"] +
+         3 * (w * w * u * B["210"] + w * u * u * B["120"] +
+              w * w * v * B["201"] + w * v * v * B["102"] +
+              u * u * v * B["021"] + u * v * v * B["012"]) +
+         6 * u * v * w * B["111"];
 }
 
 std::vector<Vector2> get_discretized_face(int lod) {
   // return local (barycentric position) (u,v) position
   // of new vertices of a face
-  double step = 1. / (lod + 1);
+  double margin_left;
   std::vector<Vector2> positions;
-
-  for (int i = 0; i <= lod; i++) {
-    for (int j = 0; j <= lod; j++) {
-      if ((i == 0 && j == 0) || (i + j > lod + 1))
-        continue; // we don't want to add corner
-      positions.push_back(Vector2{i * step, j * step});
+  for (int w = 0; w <= lod + 1; w++) {
+    for (int t = 0; t <= w; t++) {
+      margin_left = w * (1. / (lod + 1));
+      if (w == 0) {
+        positions.push_back(Vector2{0, 0});
+      } else {
+        positions.push_back(Vector2{((float)t / (float)w) * margin_left,
+                                    ((float)(1 - t) / (float)w) * margin_left});
+      }
     }
   }
   // for (int k=0; k<positions.size(); k++) {
@@ -159,101 +191,27 @@ std::vector<Vector2> get_discretized_face(int lod) {
 }
 
 void set_pn_triangle(Face face, std::unordered_set<Vector3> seen_points,
-                     int lod) {
+                     int lod, Obj obj) {
   // transform a triangle face into a curved pn triangle
   // TODO: just inserting new point on the original face doesn't work
-  std::vector<Vector3> T = get_control_points(face);
-  std::vector<Vertex> P = get_vertices(face);
+  BezierTile B = get_bezier_tile(face);
+  std::vector<Vector2> discretized_face = get_discretized_face(lod);
 
-  for (Vector3 cp : T) {
-    auto it = seen_points.find(cp);
-    if (it == seen_points.end()) {
-      seen_points.insert(cp);
-      Vertex center_point = mesh->insertVertex(face);
-      geometry->vertexPositions[center_point.getIndex()] = cp;
+  for (int c = 0; c <= lod; c++) {
+    obj.add_face({});
+    for (int i = 1; i < c - 1; i++) {
     }
   }
 
-  // int first_index, second_index;
-  //
-  // Edge edge_to_add;
-  //
-  // for (int i = 0; i < 3; i++) {
-  //   for (Edge e : P[i].adjacentEdges()) {
-  //     if (e.otherVertex(P[i]) == P[(i + 1) % 3]) {
-  //       edge_to_add = e;
-  //       break;
-  //     }
-  //   }
-  //   if (i == 0) {
-  //     first_index = 5;
-  //   } else if (i == 1) {
-  //     first_index = 1;
-  //   } else {
-  //     first_index = 2;
-  //   }
-  //   auto it = seen_points.find(T[first_index]);
-  //
-  //   if (it == seen_points.end()) {
-  //     // It means that the point is not already in the surface mesh
-  //     seen_points.insert(T[first_index]);
-  //     Halfedge he = mesh->insertVertexAlongEdge(edge_to_add);
-  //     geometry->vertexPositions[he.vertex().getIndex()] = T[first_index];
-  //     for (Edge ep : he.vertex().adjacentEdges()) {
-  //       if (ep.otherVertex(he.vertex()) == P[(i + 1) % 3]) {
-  //         if (i == 0) {
-  //           second_index = 3;
-  //         } else if (i == 1) {
-  //           second_index = 0;
-  //         } else {
-  //           second_index = 4;
-  //         }
-  //         auto it = seen_points.find(T[second_index]);
-  //
-  //         if (it == seen_points.end()) {
-  //           // It means that the point is not already in the surface mesh
-  //           seen_points.insert(T[second_index]);
-  //           Halfedge hep = mesh->insertVertexAlongEdge(ep);
-  //           geometry->vertexPositions[hep.vertex().getIndex()] =
-  //               T[second_index];
-  //         }
-  //       }
-  //     }
-  //   } else {
-  //     if (i == 0) {
-  //       second_index = 3;
-  //     } else if (i == 1) {
-  //       second_index = 0;
-  //     } else {
-  //       second_index = 4;
-  //     }
-  //     auto it = seen_points.find(T[second_index]);
-  //
-  //     if (it == seen_points.end()) {
-  //       // It means that the point is not already in the surface mesh
-  //       seen_points.insert(T[second_index]);
-  //       Halfedge hep = mesh->insertVertexAlongEdge(edge_to_add);
-  //       geometry->vertexPositions[hep.vertex().getIndex()] = T[second_index];
-  //     }
-  //   }
-  // }
-
-  // int first_index;
-  // for (int i = 0; i < 3; i++) {
-  //   Vertex new_point = mesh->insertVertex(face);
-  //   if (i == 0) {
-  //     first_index = 5;
-  //   } else if (i == 1) {
-  //     first_index = 1;
-  //   } else {
-  //     first_index = 2;
-  //   }
-  //   geometry->vertexPositions[new_point] = T[first_index];
-  // }
-
-  // Vertex center_point = mesh->insertVertex(face);
-  // geometry->vertexPositions[center_point.getIndex()] = T[6];
-  mesh->triangulate(face);
+  for (Vector2 uv : discretized_face) {
+    Vector3 p = get_point_position(uv.x, uv.y, B);
+    auto it = seen_points.find(p);
+    if (it == seen_points.end()) {
+      seen_points.insert(p);
+      Vertex center_point = mesh->insertVertex(face);
+      geometry->vertexPositions[center_point.getIndex()] = p;
+    }
+  }
 }
 
 // == MAIN
@@ -284,7 +242,7 @@ int main(int argc, char **argv) {
 
   std::unordered_set<Vector3> seen_points;
   for (auto face : mesh->faces()) {
-    set_pn_triangle(face, seen_points, 0);
+    set_pn_triangle(face, seen_points, 5);
   }
 
   // Register the mesh with polyscope
