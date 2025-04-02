@@ -8,18 +8,19 @@
 
 #include "geometrycentral/utilities/vector2.h"
 #include "geometrycentral/utilities/vector3.h"
+#include "polyscope/point_cloud.h"
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include <Eigen/src/SparseCore/SparseUtil.h>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
-// #include <vector>
-#include "polyscope/point_cloud.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -42,21 +43,55 @@ void print_point(std::map<int, int> p) {
   }
   std::cout << "}\n";
 }
+
+bool custome_compare(const std::pair<int, int> &p1,
+                     const std::pair<int, int> &p2) {
+  return p1.second > p2.second ||
+         (p1.second == p2.second && p1.first > p2.first);
+}
+
+std::vector<std::pair<int, int>>
+transform_bary_map(std::map<int, int> bary_map) {
+  std::vector<std::pair<int, int>> out;
+  for (auto coord : bary_map) {
+    out.push_back(std::make_pair(coord.first, coord.second));
+  }
+  return out;
+}
+
 struct Vector3Cmp {
   bool operator()(const std::map<int, int> &lhs,
                   const std::map<int, int> &rhs) const {
-    int lod = 0;
-    int same = 0;
-    for (auto coord : lhs) {
-      lod += coord.second;
-      auto it = rhs.find(coord.first);
-      if (it != rhs.end() && it->second == coord.second) {
-        same += it->second;
+    std::vector<std::pair<int, int>> lhs_v = transform_bary_map(lhs);
+    std::sort(lhs_v.begin(), lhs_v.end(), custome_compare);
+    std::vector<std::pair<int, int>> rhs_v = transform_bary_map(rhs);
+    std::sort(rhs_v.begin(), rhs_v.end(), custome_compare);
+    for (int i = 0; i < 3; i++) {
+      if (lhs_v[i].second == 0 && rhs_v[i].second == 0) {
+        return false;
+      }
+      if (lhs_v[i].first < rhs_v[i].first ||
+          (lhs_v[i].first == rhs_v[i].first &&
+           lhs_v[i].second < rhs_v[i].second)) {
+        return true;
+      }
+      if (lhs_v[i].first != rhs_v[i].first ||
+          lhs_v[i].second != rhs_v[i].second) {
+        return false;
       }
     }
-    return lod != same;
+    return false;
   }
 };
+
+void print_vector_sorted(std::vector<std::pair<int, int>> v) {
+  std::cout << "{";
+  for (auto p : v) {
+    std::cout << "(" << p.first << ";" << p.second << "),";
+  }
+  std::cout << "}\n";
+}
+
 int argmin_index(std::vector<Vertex> P) {
   int min_index = P[0].getIndex();
   int argmin = 0;
@@ -105,11 +140,23 @@ Vector3 get_point_position(std::map<int, int> p, BezierTile B, int lod,
          6 * u * v * w * B["111"];
 }
 
+Vector3 get_normal(std::map<int, int> p, BezierTile B, int lod, Face f) {
+  std::vector<Vertex> v_f = get_vertices(f);
+
+  double u = (double)p[v_f[1].getIndex()] / (lod + 1);
+  double v = (double)p[v_f[2].getIndex()] / (lod + 1);
+  double w = (double)p[v_f[0].getIndex()] / (lod + 1);
+  Vector3 N = std::pow(w, 3) * B["n_200"] + std::pow(u, 3) * B["n_020"] +
+              std::pow(v, 3) * B["n_002"] + u * w * B["n_110"] +
+              u * v * B["n_011"] + v * w * B["n_101"];
+  return N / dot(N, N);
+}
 class Obj {
 public:
   std::map<std::map<int, int>, int, Vector3Cmp> index_vertices;
   int nb_points;
   std::vector<Vector3> vertices;
+  std::vector<Vector3> normals;
   std::vector<std::array<int, 3>> faces;
   Obj() { nb_points = 0; }
   void add_vertex(std::map<int, int> v, BezierTile B, int lod, Face f) {
@@ -117,6 +164,7 @@ public:
     if (it == index_vertices.end()) {
       index_vertices.insert({v, nb_points});
       vertices.push_back(get_point_position(v, B, lod, f));
+      normals.push_back(get_normal(v, B, lod, f));
       nb_points++;
     }
   }
@@ -125,11 +173,19 @@ public:
     if (it == index_vertices.end()) {
       // std::cout << "Adding :";
       // print_point(v);
+      // auto vp = transform_bary_map(v);
+      // std::sort(vp.begin(), vp.end(), custome_compare);
+      // std::cout << "It looks like this sorted :";
+      // print_vector_sorted(vp);
       add_vertex(v, B, lod, f);
       return nb_points - 1;
     } else {
       // std::cout << "This point is already in :";
       // print_point(v);
+      // auto vp = transform_bary_map(v);
+      // std::sort(vp.begin(), vp.end(), custome_compare);
+      // std::cout << "It looks like this sorted :";
+      // print_vector_sorted(vp);
       return it->second;
     }
   }
@@ -145,6 +201,9 @@ public:
     for (Vector3 v : vertices) {
       file << "v " << v.x << " " << v.y << " " << v.z << "\n";
     }
+    for (Vector3 n : normals) {
+      file << "vn " << n.x << " " << n.y << " " << n.z << "\n";
+    }
     for (std::array<int, 3> f : faces) {
       file << "f " << f[0] << " " << f[1] << " " << f[2] << "\n";
     }
@@ -154,6 +213,29 @@ public:
 // == ALGORITHM FUNCTIONS
 
 // ## MAIN FUNCTIONS #########################
+
+void add_normal_midedge(BezierTile B, Face face, int opposite_vertex) {
+  std::vector<Vertex> P = get_vertices(face);
+  double v = dot((geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
+                  geometry->vertexPositions[P[(opposite_vertex + 1) % 3]]),
+                 (geometry->vertexNormals[P[(opposite_vertex + 1) % 3]] -
+                  geometry->vertexNormals[P[(opposite_vertex + 2) % 3]])) /
+             dot((geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
+                  geometry->vertexPositions[P[(opposite_vertex + 1) % 3]]),
+                 (geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
+                  geometry->vertexPositions[P[(opposite_vertex + 1) % 3]]));
+  Vector3 h = geometry->vertexNormals[P[(opposite_vertex + 1) % 3]] +
+              geometry->vertexNormals[P[(opposite_vertex + 2) % 3]] +
+              v * geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
+              geometry->vertexPositions[P[(opposite_vertex + 1) % 3]];
+  if (opposite_vertex == 0) {
+    B.insert({"n_011", h / dot(h, h)});
+  } else if (opposite_vertex == 1) {
+    B.insert({"n_101", h / dot(h, h)});
+  } else {
+    B.insert({"n_110", h / dot(h, h)});
+  }
+}
 
 BezierTile get_bezier_tile(Face face) {
   // Get the positions of all the bezier control points of a face.
@@ -169,10 +251,16 @@ BezierTile get_bezier_tile(Face face) {
       int k = 3 - i - j;
       if (i == 3) {
         B.insert({"300", geometry->vertexPositions[P[0]]});
+        B.insert({"n_200", geometry->vertexNormals[P[0]]});
+        add_normal_midedge(B, face, 0);
       } else if (j == 3) {
         B.insert({"030", geometry->vertexPositions[P[1]]});
+        B.insert({"n_020", geometry->vertexNormals[P[0]]});
+        add_normal_midedge(B, face, 1);
       } else if (k == 3) {
         B.insert({"003", geometry->vertexPositions[P[2]]});
+        B.insert({"n_002", geometry->vertexNormals[P[0]]});
+        add_normal_midedge(B, face, 2);
       }
       if (i == j) {
         continue;
@@ -302,6 +390,8 @@ int main(int argc, char **argv) {
                               // where f is the face
   geometry->requireVertexNormals();
 
+  i_obj->addVertexVectorQuantity("Input normals", geometry->vertexNormals);
+
   int lod = 2;
 
   for (auto face : mesh->faces()) {
@@ -311,6 +401,8 @@ int main(int argc, char **argv) {
   // Register the mesh with polyscope
   auto o_obj =
       polyscope::registerSurfaceMesh("Output obj", obj.vertices, obj.faces);
+
+  o_obj->addVertexVectorQuantity("Normals", obj.normals);
 
   obj.write_to_file(MyFile);
 
