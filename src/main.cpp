@@ -11,17 +11,20 @@
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include <Eigen/src/SparseCore/SparseUtil.h>
-// #include <fstream>
+#include <fstream>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 // #include <vector>
-// #include "polyscope/point_cloud.h"
+#include "polyscope/point_cloud.h"
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
+
+double alpha = 1;
 
 // == Geometry-central data
 std::unique_ptr<ManifoldSurfaceMesh> mesh;
@@ -32,41 +35,28 @@ std::unique_ptr<VertexPositionGeometry> geometryOut;
 
 typedef std::map<std::string, Vector3> BezierTile;
 
-class Obj {
-public:
-  std::map<Vector3, int> index_vertices;
-  int nb_points;
-  std::vector<Vector3> vertices;
-  std::vector<std::array<int, 3>> faces;
-  Obj() { nb_points = 0; }
-  void add_vertex(Vector3 v) {
-    auto it = index_vertices.find(v);
-    if (it == index_vertices.end()) {
-      index_vertices.insert({v, nb_points});
-      vertices.push_back(v);
-      nb_points++;
-    }
+void print_point(std::map<int, int> p) {
+  std::cout << "{";
+  for (auto c : p) {
+    std::cout << "(" << c.first << ", " << c.second << ");";
   }
-  int get_index(Vector3 v) {
-    auto it = index_vertices.find(v);
-    if (it == index_vertices.end()) {
-      add_vertex(v);
-      return nb_points - 1;
-    } else {
-      return it->second;
+  std::cout << "}\n";
+}
+struct Vector3Cmp {
+  bool operator()(const std::map<int, int> &lhs,
+                  const std::map<int, int> &rhs) const {
+    int lod = 0;
+    int same = 0;
+    for (auto coord : lhs) {
+      lod += coord.second;
+      auto it = rhs.find(coord.first);
+      if (it != rhs.end() && it->second == coord.second) {
+        same += it->second;
+      }
     }
-  }
-  void add_face(std::array<Vector3, 3> f) {
-    std::array<int, 3> new_f;
-    for (int i = 0; i < 3; i++) {
-      new_f[i] = get_index(f[i]);
-    }
-    faces.push_back(new_f);
+    return lod != same;
   }
 };
-
-// == ALGORITHM FUNCTIONS
-
 int argmin_index(std::vector<Vertex> P) {
   int min_index = P[0].getIndex();
   int argmin = 0;
@@ -100,6 +90,68 @@ std::vector<Vertex> get_vertices(Face face) {
   P = shift_indices(P, argmin);
   return P;
 }
+Vector3 get_point_position(std::map<int, int> p, BezierTile B, int lod,
+                           Face f) {
+  std::vector<Vertex> v_f = get_vertices(f);
+
+  double u = (double)p[v_f[1].getIndex()] / (lod + 1);
+  double v = (double)p[v_f[2].getIndex()] / (lod + 1);
+  double w = (double)p[v_f[0].getIndex()] / (lod + 1);
+  return std::pow(w, 3) * B["300"] + std::pow(u, 3) * B["030"] +
+         std::pow(v, 3) * B["003"] +
+         3 * (w * w * u * B["210"] + w * u * u * B["120"] +
+              w * w * v * B["201"] + w * v * v * B["102"] +
+              u * u * v * B["021"] + u * v * v * B["012"]) +
+         6 * u * v * w * B["111"];
+}
+
+class Obj {
+public:
+  std::map<std::map<int, int>, int, Vector3Cmp> index_vertices;
+  int nb_points;
+  std::vector<Vector3> vertices;
+  std::vector<std::array<int, 3>> faces;
+  Obj() { nb_points = 0; }
+  void add_vertex(std::map<int, int> v, BezierTile B, int lod, Face f) {
+    auto it = index_vertices.find(v);
+    if (it == index_vertices.end()) {
+      index_vertices.insert({v, nb_points});
+      vertices.push_back(get_point_position(v, B, lod, f));
+      nb_points++;
+    }
+  }
+  int get_index_or_assign(std::map<int, int> v, BezierTile B, int lod, Face f) {
+    auto it = index_vertices.find(v);
+    if (it == index_vertices.end()) {
+      // std::cout << "Adding :";
+      // print_point(v);
+      add_vertex(v, B, lod, f);
+      return nb_points - 1;
+    } else {
+      // std::cout << "This point is already in :";
+      // print_point(v);
+      return it->second;
+    }
+  }
+  void add_face(std::array<std::map<int, int>, 3> f, BezierTile B, int lod,
+                Face face) {
+    std::array<int, 3> new_f;
+    for (int i = 0; i < 3; i++) {
+      new_f[i] = get_index_or_assign(f[i], B, lod, face);
+    }
+    faces.push_back(new_f);
+  }
+  void write_to_file(std::ofstream &file) {
+    for (Vector3 v : vertices) {
+      file << "v " << v.x << " " << v.y << " " << v.z << "\n";
+    }
+    for (std::array<int, 3> f : faces) {
+      file << "f " << f[0] << " " << f[1] << " " << f[2] << "\n";
+    }
+  }
+};
+
+// == ALGORITHM FUNCTIONS
 
 // ## MAIN FUNCTIONS #########################
 
@@ -145,7 +197,11 @@ BezierTile get_bezier_tile(Face face) {
       double w = dot(Pmin - Pmax, N);
       Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
       E += b;
-      B.insert({std::to_string(i * 100 + j * 10 + k), b});
+      if (i != 0) {
+        B.insert({std::to_string(i * 100 + j * 10 + k), b});
+      } else {
+        B.insert({"0" + std::to_string(j * 10 + k), b});
+      }
     }
   }
   for (Vertex p : P) {
@@ -153,34 +209,22 @@ BezierTile get_bezier_tile(Face face) {
   }
   V /= 3;
   E /= 6;
-  B.insert({"111", E + ((E - V) / 2)});
+  B.insert({"111", (1 - alpha) * E + alpha * V});
   return B;
 }
 
-Vector3 get_point_position(double u, double v, BezierTile B) {
-  double w = 1 - u - v;
-  return std::pow(w, 3) * B["300"] + std::pow(u, 3) * B["030"] +
-         std::pow(v, 3) * B["003"] +
-         3 * (w * w * u * B["210"] + w * u * u * B["120"] +
-              w * w * v * B["201"] + w * v * v * B["102"] +
-              u * u * v * B["021"] + u * v * v * B["012"]) +
-         6 * u * v * w * B["111"];
-}
-
-std::vector<Vector2> get_discretized_face(int lod) {
+std::vector<std::map<int, int>> get_discretized_face(int lod, Face f) {
   // return local (barycentric position) (u,v) position
   // of new vertices of a face
-  double margin_left;
-  std::vector<Vector2> positions;
+  std::vector<Vertex> v_f = get_vertices(f);
+  std::vector<std::map<int, int>> positions;
   for (int w = 0; w <= lod + 1; w++) {
     for (int t = 0; t <= w; t++) {
-      margin_left = w * (1. / (lod + 1));
-      if (w == 0) {
-        positions.push_back(Vector2{0, 0});
-      } else {
-        positions.push_back(Vector2{((float)t / (float)w) * margin_left,
-                                    ((float)(1 - t) / (float)w) * margin_left});
-      }
+      std::map<int, int> coord_bary;
+      coord_bary[v_f[2].getIndex()] = t;
+      coord_bary[v_f[1].getIndex()] = w - t;
+      coord_bary[v_f[0].getIndex()] = lod + 1 - w;
+      positions.push_back(coord_bary);
     }
   }
   // for (int k=0; k<positions.size(); k++) {
@@ -190,28 +234,44 @@ std::vector<Vector2> get_discretized_face(int lod) {
   return positions;
 }
 
-void set_pn_triangle(Face face, std::unordered_set<Vector3> seen_points,
-                     int lod, Obj obj) {
+void set_pn_triangle(Face face, int lod, Obj &obj) {
   // transform a triangle face into a curved pn triangle
   // TODO: just inserting new point on the original face doesn't work
   BezierTile B = get_bezier_tile(face);
-  std::vector<Vector2> discretized_face = get_discretized_face(lod);
+  std::vector<std::map<int, int>> discretized_face =
+      get_discretized_face(lod, face);
 
-  for (int c = 0; c <= lod; c++) {
-    obj.add_face({});
-    for (int i = 1; i < c - 1; i++) {
+  int start_layer, first_neighbor, second_neighbor;
+
+  for (int l = 0; l <= lod; l++) {
+    start_layer = (int)l * (l + 1) / 2;
+    for (int i = start_layer; i < start_layer + l + 1; i++) {
+      // Adding triangle with both neighbors in next layer
+      first_neighbor = i + l + 1;
+      second_neighbor = i + l + 2;
+      obj.add_face({discretized_face[i], discretized_face[first_neighbor],
+                    discretized_face[second_neighbor]},
+                   B, lod, face);
+      // Adding triangle (if possible) with second neighbor in next layer
+      // and next neighbor in same layer (might not exist)
+      // i + 1 := next neighbor in the same layer
+      if (i + 1 < start_layer + l + 1) {
+        obj.add_face({discretized_face[i], discretized_face[second_neighbor],
+                      discretized_face[i + 1]},
+                     B, lod, face);
+      }
     }
   }
 
-  for (Vector2 uv : discretized_face) {
-    Vector3 p = get_point_position(uv.x, uv.y, B);
-    auto it = seen_points.find(p);
-    if (it == seen_points.end()) {
-      seen_points.insert(p);
-      Vertex center_point = mesh->insertVertex(face);
-      geometry->vertexPositions[center_point.getIndex()] = p;
-    }
-  }
+  // for (Vector2 uv : discretized_face) {
+  //   Vector3 p = get_point_position(uv.x, uv.y, B);
+  //   auto it = seen_points.find(p);
+  //   if (it == seen_points.end()) {
+  //     seen_points.insert(p);
+  //     Vertex center_point = mesh->insertVertex(face);
+  //     geometry->vertexPositions[center_point.getIndex()] = p;
+  //   }
+  // }
 }
 
 // == MAIN
@@ -223,11 +283,13 @@ int main(int argc, char **argv) {
   // Load input mesh
   std::tie(mesh, geometry) = readManifoldSurfaceMesh(argv[1]);
 
-  // ofstream MyFile("output.obj");
+  std::ofstream MyFile("output.obj");
 
   auto i_obj = polyscope::registerSurfaceMesh(
       "Input obj", geometry->inputVertexPositions, mesh->getFaceVertexList(),
       polyscopePermutations(*mesh));
+
+  Obj obj;
 
   // // Create output mesh
   // meshOut = std::make_unique<ManifoldSurfaceMesh>();
@@ -240,17 +302,19 @@ int main(int argc, char **argv) {
                               // where f is the face
   geometry->requireVertexNormals();
 
-  std::unordered_set<Vector3> seen_points;
+  int lod = 2;
+
   for (auto face : mesh->faces()) {
-    set_pn_triangle(face, seen_points, 5);
+    set_pn_triangle(face, lod, obj);
   }
 
   // Register the mesh with polyscope
-  auto o_obj = polyscope::registerSurfaceMesh(
-      "Output obj", geometry->inputVertexPositions, mesh->getFaceVertexList(),
-      polyscopePermutations(*mesh));
+  auto o_obj =
+      polyscope::registerSurfaceMesh("Output obj", obj.vertices, obj.faces);
 
-  // MyFile.close();
+  obj.write_to_file(MyFile);
+
+  MyFile.close();
   // Give control to the polyscope gui
   polyscope::show();
 
