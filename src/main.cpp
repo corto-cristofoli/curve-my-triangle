@@ -33,34 +33,42 @@ typedef std::map<std::string, Vector3> BezierTile;
 
 bool custome_compare_pair(const std::pair<int, int> &p1,
                           const std::pair<int, int> &p2) {
+  // Comparator described in equation (1) in the report
   return p1.second > p2.second ||
          (p1.second == p2.second && p1.first > p2.first);
 }
 
 struct BaryCmp {
+  // Comparator depicted in Figure 5 in the report
   bool operator()(const std::vector<std::pair<int, int>> &lhs,
                   const std::vector<std::pair<int, int>> &rhs) const {
     std::vector<std::pair<int, int>> lhs_sorted(3);
     std::vector<std::pair<int, int>> rhs_sorted(3);
-    int len = sizeof(std::pair<int, int>) * 3;
+    // Doing a copy here because the order of the point in the representation is
+    // useful to compute the projection on the Bézier tile
     std::partial_sort_copy(lhs.begin(), lhs.end(), lhs_sorted.begin(),
                            lhs_sorted.end(), custome_compare_pair);
     std::partial_sort_copy(rhs.begin(), rhs.end(), rhs_sorted.begin(),
                            rhs_sorted.end(), custome_compare_pair);
     for (int i = 0; i < 3; i++) {
       if (lhs_sorted[i].second == 0 && rhs_sorted[i].second == 0) {
+        // If this case happens it means that both representation have same
+        // non-negative coordinates, it means they are equal so we return false
         return false;
       }
       if (lhs_sorted[i].first < rhs_sorted[i].first ||
           (lhs_sorted[i].first == rhs_sorted[i].first &&
            lhs_sorted[i].second < rhs_sorted[i].second)) {
+        // In this case it's the classical lexicographic order
         return true;
       }
       if (lhs_sorted[i].first != rhs_sorted[i].first ||
           lhs_sorted[i].second != rhs_sorted[i].second) {
+        // In this case again it's the classical lexicographic order
         return false;
       }
     }
+    // If we arrive at this point it means that they are equal
     return false;
   }
 };
@@ -149,6 +157,7 @@ public:
   Obj() { nb_points = 0; }
 
   void add_vertex(std::vector<std::pair<int, int>> v, BezierTile B, int lod) {
+    // Only inserting if v is not already in vertices
     auto it = index_vertices.find(v);
     if (it == index_vertices.end()) {
       index_vertices.insert({v, nb_points});
@@ -160,6 +169,8 @@ public:
 
   int get_index_or_assign(std::vector<std::pair<int, int>> v, BezierTile B,
                           int lod) {
+    // Either return the index of v if v is already in vertices, either add v to
+    // vertices the returns it index
     auto it = index_vertices.find(v);
     if (it == index_vertices.end()) {
       add_vertex(v, B, lod);
@@ -171,6 +182,7 @@ public:
 
   void add_face(std::array<std::vector<std::pair<int, int>>, 3> f, BezierTile B,
                 int lod) {
+    // Add a face to faces
     std::array<int, 3> new_f;
     for (int i = 0; i < 3; i++) {
       new_f[i] = get_index_or_assign(f[i], B, lod);
@@ -179,6 +191,8 @@ public:
   }
 
   void write_to_file(std::ofstream &file) {
+    // Export the Obj in obj file
+
     for (Vector3 v : vertices) {
       file << "v " << v.x << " " << v.y << " " << v.z << "\n";
     }
@@ -186,7 +200,8 @@ public:
       file << "vn " << n.x << " " << n.y << " " << n.z << "\n";
     }
     for (std::array<int, 3> f : faces) {
-      file << "f " << f[0] << " " << f[1] << " " << f[2] << "\n";
+      file << "f " << f[0] << "//" << f[0] << " " << f[1] << "//" << f[1] << " "
+           << f[2] << "//" << f[2] << "\n";
     }
   }
 };

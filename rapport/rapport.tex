@@ -152,7 +152,10 @@ Ici on a \texttt{Obj.index\_vertices : map<vector<pair<int,int>>,int>}, cela veu
 
 Pour cela nous effectuons d'abord un tri sur le \texttt{vector} des coordonnées de manières à trier selon l'ordre lexicographique inversé sur l'ordre et sur les coordonnées, \textit{i.e.}:
 
-$$(i,j) <_{pair} (k,l) \Leftrightarrow l < j \textrm{ ou } \left(l=j\textrm{ et } k < i\right)$$
+\begin{equation}
+(i,j) <_{pair} (k,l) \Leftrightarrow l < j \textrm{ ou } \left(l=j\textrm{ et } k < i\right)
+\end{equation}
+
 
 Cela permet alors d'ordonné facilement les représentations triées en considérant l'ordre lexicographique sur la partie ou la représentation a des coordonnées strictement positives. Pour exemple reprenons les deux représentations de la figure \ref{fig:doublerepr}.
 \begin{figure}[H]
