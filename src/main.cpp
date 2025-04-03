@@ -239,8 +239,7 @@ void add_normal_midedge(BezierTile B, Face face, int opposite_vertex) {
 }
 
 BezierTile get_bezier_tile(Face face) {
-  // Get the positions of all the bezier control points of a face.
-  // With those control points b, we can then apply
+  // Get the positions of all the Bézier control points of a face.
 
   BezierTile B;
   std::vector<Vertex> P = get_vertices(face);
@@ -373,15 +372,11 @@ int main(int argc, char **argv) {
       "Input obj", geometry->inputVertexPositions, mesh->getFaceVertexList(),
       polyscopePermutations(*mesh));
 
-  Obj obj;
-
-  geometry->requireFaceAreas(); // get area by using geometry->faceAreas[f]
-                                // where f is the face
-  geometry
-      ->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
-                              // where f is the face
+  geometry->requireFaceAreas();
+  geometry->requireFaceNormals();
   geometry->requireVertexNormals();
 
+  Obj obj;
   int lod = 2;
 
   for (auto face : mesh->faces()) {
