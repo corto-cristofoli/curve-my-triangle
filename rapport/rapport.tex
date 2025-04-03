@@ -12,6 +12,10 @@
 \usepackage{graphicx}
 \graphicspath{ {./images} }
 
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{position=below}
+
 \def\Cpp{C\texttt{++} }
 
 \title{Rapport CGDI}
@@ -34,9 +38,9 @@ L'article présente un algorithme de lissage de modèles 3D de basse résolution
 Pour cela, l'idée est d'utiliser la méthode des « Curved PN triangles ». Un
 modèle 3D de basse résolution n'a que peu de polygones et donc une alure
 nécessairement anguleuse. Pour le rendre plus organique un lissage est
-nécessaire : il faut rajouter un grand nombre de triangles afin de faire
-disparaitre ces angles. Ce rajout se fait algorithmiquement en suivant des
-surfaces de bézier triangulaires.
+nécessaire : il faut rajouter un grand nombre de triangle afin de faire
+disparaître ces angles. Ce rajout se fait algorithmiquement en suivant des
+surfaces de Bézier triangulaires.
 
 Si l'article décrit l'algorithme de manière théorique, nous nous sommes penchés
 sur sa compréhension et son implémentation en \Cpp à l'aide de la
@@ -45,7 +49,24 @@ bibliothèque \textbf{geometry-central}.
 
 \section{Principe de l'algorithme}
 Dans tout le rapport nous considérons qu'un modèle 3D est un ensemble de face
-triangulaires.
+triangulaires. Il est facile de se ramener à ce cas ci en triangulant
+simplement les faces non triangulaires.
+
+L'algorithme vise à transformer chaque faces triangulaires en une multitude,
+dépendant d'un facteur : le \textit{level of detail} ou \texttt{lod}.
+
+% TODO: inserer image de plusieurs modèles en fonction du lod
+\begin{figure}[ht!]
+\centering
+    \includegraphics[width=0.6\textwidth]{lod}
+    \caption{Sous-triangulation en fonction du \texttt{lod} (de 0 à 5)}
+    \label{fig:lod}
+\end{figure}
+
+Concrètement, le \texttt{lod} correspond au nombre de sommets à ajouter sur une
+arête du triangle d'origine (voir \ref{fig:lod}).
+
+
 
 \section{Enjeux d'implémentation de \textit{Geometry Central}}
 % Où on explique comment fonctionne `geometry-central` avec uniquement la
