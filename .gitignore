@@ -3,3 +3,8 @@ CMakeFiles
 imgui.ini
 .polyscope.ini
 .cache
+*.fls
+*.synctex.gz
+*.aux
+*.log
+*.fdb_latexmk

@@ -4,7 +4,7 @@
 \usepackage[french]{babel}
 \usepackage[autolanguage]{numprint} % for the \nombre command
 
-\usepackage{hyphenat}
+\usepackage{hyphenat, tikz}
 \hyphenation{mate-mática recu-perar}
 
 \usepackage{graphicx}
@@ -32,7 +32,7 @@ L'article présente un algorithme de lissage de modèles 3D de basse résolution
 Pour cela, l'idée est d'utiliser la méthode des « Curved PN triangles ». Un
 modèle 3D de basse résolution n'a que peu de polygones et donc une alure
 nécessairement anguleuse. Pour le rendre plus organique un lissage est
-nécessaire : il faut rajouter un grand nombre de triangle afin de faire
+nécessaire : il faut rajouter un grand nombre de triangles afin de faire
 disparaitre ces angles. Ce rajout se fait algorithmiquement en suivant des
 surfaces de bézier triangulaires.
 
@@ -52,6 +52,85 @@ triangulaires.
 % (je peux le faire ça)
 
 \section{Indexation des sommets du modèle 3D}
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\draw (0,0)--(5.19,3) node[black,above]{\texttt{6}}node[gray,right]{$P_{1}$};
+\draw (5.19,3)--(5.19,-3)node[black,below]{\texttt{9}}node[gray,right]{$P_{2}$};
+\draw (5.19,-3)--(0,0)node[black,below]{\texttt{0}}node[gray,left]{$P_{0}$};
+\draw (1.73,1)node[black,above]{\texttt{1}}--(1.73,-1)node[black,below]{\texttt{2}};
+\draw (3.46,2)node[black,above]{\texttt{3}}--(3.46,0)node[black,right=0.17cm]{\texttt{4}};
+\draw (3.46,0)--(3.46,-2)node[black,below]{\texttt{5}};
+\draw (3.46,2)--(5.19,1)node[black,right]{\texttt{7}};
+\draw (3.46,-2)--(5.19,-1)node[black,right]{\texttt{8}};
+\draw (1.73,1)--(5.19,-1);
+\draw (1.73,-1)--(5.19,1);
+\draw[gray,dashed] (0,-0.5)--(0,-3.5)node[below]{Couche 0};
+\draw[gray,dashed] (1.73,-1.5)--(1.73,-3.5)node[below]{Couche 1};
+\draw[gray,dashed] (3.46,-2.5)--(3.46,-3.5)node[below]{Couche 2};
+\draw[gray,dashed] (5.19,-3.5)--(5.19,-3.5)node[below]{Couche 3};
+\end{tikzpicture}
+\caption{Indexation de la triangulation d'une face pour un \texttt{lod} de 2}
+\end{figure}
+
+On numérote la discrétisation de la face de cette manière pour avoir facilement les nouvelles faces. En effet on remarque que pour un sommet $i$ dans une couche $c$, on a que ses deux voisins dans la couche $c+1$ sont les sommets $i+c+1$ et $i+c+2$. Cela permet de déduire rapidement les nouvelles faces à ajouter en disant que pour une discrétisation avec un \texttt{lod} $l$, on ajoute pour chaque sommets $i$ dans une couche $c$ avec $c\leq l$ la face $(i,i+c+1,i+c+2)$ et la face $(i,i+c+2,i+1)$ si $i+1$ est aussi dans la couche $c$ (\textit{i.e.} $i+1< \frac{(c+2)(c+1)}{2}$)
+\begin{figure}
+\centering
+\begin{tikzpicture}
+    \draw (0,0)--(5.19,3)node[black,right]{\texttt{j+1}};
+\draw (5.19,3)--(5.19,-3);
+\draw (5.19,-3)--(0,0);
+\draw[line width=0.35mm,red] (1.73,1)node[black,above]{\texttt{i}}--(1.73,-1)node[black,below]{\texttt{i+1}};
+\draw[line width=0.35mm,red] (3.46,2)node[black,above left]{\texttt{i+c+1}}--(3.46,0)node[black,right=0.17cm]{\texttt{i+c+2}};
+\draw[line width=0.35mm,red] (1.73,1)--(3.46,2);
+\draw[line width=0.35mm,red] (1.73,1)--(3.46,0);
+\draw[line width=0.35mm,red] (1.73,-1)--(3.46,0);
+\draw (3.46,0)--(3.46,-2)node[black,below]{\texttt{j}};
+\draw (3.46,2)--(5.19,1);
+\draw (3.46,-2)--(5.19,-1);
+\draw (3.46,0)--(5.19,-1);
+\draw (3.46,0)--(5.19,1);
+\draw[gray,dashed] (1.73,-1.5)--(1.73,-3.5)node[below]{Couche \texttt{c}};
+\end{tikzpicture}
+\caption{Exemple de faces ajoutées pour un sommet \texttt{i} dans la couche \texttt{c} ainsi que le cas où \texttt{j} et \texttt{j+1} ne sont pas dans la même couche}
+\end{figure}
+
+Chaque sommets est alors identifié par ses coordonnées barycentriques en fonction de $(P_{0},P_{1},P_{2})$, étant donné que ces coordonnées sont rationnelles et sont en fait des multiples de $\frac{1}{\texttt{lod}+1}$ nous avons décider de garder des coordonnées entières pour identifier les sommets tout en gardant le \texttt{lod} lorqu'il s'agit de calculer la position du sommet dans la tuile de Bézier.
+
+Ainsi un sommet est représenté par un \texttt{vector} de \texttt{pair(int,int)} de taille 3, tel que pour chaque pair, le premier élément est l'indice du point $P_{i}$ et le second est la coordonnée barycentrique associée au point $P_{i}$.
+
+Pour recréer un nouvel objet nous avons créé une petite classe \texttt{Obj} ayant les primitives pour construire un tel objet.
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\draw
+    (0,0)  node[draw] (O) {\texttt{Obj}}
+    (-4,3)  node {Fields}
+    (-4,2)  node[gray,draw]                 (i) {\texttt{index\_vertices}}
+    (-4,1)  node[gray,draw]                 (v) {\texttt{vertices}}
+    (-4,0)  node[gray,draw]                 (f) {\texttt{faces}}
+    (-4,-1)  node[gray,draw]                 (n) {\texttt{normals}}
+    (-4,-2)  node[gray,draw]                 (nb) {\texttt{nb\_points}}
+    (4,3)  node {Methods}
+    (4,1.5)  node[gray,draw]                 (av) {\texttt{add\_vertex()}}
+    (4,0.5)  node[gray,draw]                 (af) {\texttt{add\_face()}}
+    (4,-0.5)  node[gray,draw]                 (gi) {\texttt{get\_index\_or\_assign()}}
+    (4,-1.5)  node[gray,draw]                 (w) {\texttt{write\_to\_file()}};
+\draw (O) -- (i);
+\draw (O) -- (v);
+\draw (O) -- (f);
+\draw (O) -- (n);
+\draw (O) -- (nb);
+\draw (O) -- (av);
+\draw (O) -- (af);
+\draw (O) -- (gi);
+\draw (O) -- (w);
+\end{tikzpicture}
+\caption{Description de la classe \texttt{Obj}}
+\end{figure}
+
+Ici on a \texttt{Obj.index\_vertices : map<vector<pair<int,int>>,int>}
 % Où tu peux parler des unordered set et tout
 
 % TODO: pas oublier de produire des visuels !
