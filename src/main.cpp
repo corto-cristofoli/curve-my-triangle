@@ -1,14 +1,8 @@
-// #include "geometrycentral/surface/base_geometry_interface.h"
-// #include "geometrycentral/numerical/linear_algebra_types.h"
-// #include "geometrycentral/surface/direction_fields.h"
 #include "geometrycentral/surface/manifold_surface_mesh.h"
 #include "geometrycentral/surface/meshio.h"
-// #include "geometrycentral/surface/signpost_intrinsic_triangulation.h"
 #include "geometrycentral/surface/vertex_position_geometry.h"
 
-#include "geometrycentral/utilities/vector2.h"
 #include "geometrycentral/utilities/vector3.h"
-#include "polyscope/point_cloud.h"
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include <Eigen/src/SparseCore/SparseUtil.h>
@@ -18,37 +12,29 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
-
-using namespace geometrycentral;
-using namespace geometrycentral::surface;
 
 double alpha = 1;
 
 // == Geometry-central data
+
+using namespace geometrycentral;
+using namespace geometrycentral::surface;
+
 std::unique_ptr<ManifoldSurfaceMesh> mesh;
 std::unique_ptr<VertexPositionGeometry> geometry;
 
-std::unique_ptr<ManifoldSurfaceMesh> meshOut;
-std::unique_ptr<VertexPositionGeometry> geometryOut;
+// == Typedef
 
 typedef std::map<std::string, Vector3> BezierTile;
+
+// == Comparators
 
 bool custome_compare_pair(const std::pair<int, int> &p1,
                           const std::pair<int, int> &p2) {
   return p1.second > p2.second ||
          (p1.second == p2.second && p1.first > p2.first);
-}
-
-std::vector<std::pair<int, int>>
-transform_bary_map(std::map<int, int> bary_map) {
-  std::vector<std::pair<int, int>> out;
-  for (auto coord : bary_map) {
-    out.push_back(std::make_pair(coord.first, coord.second));
-  }
-  return out;
 }
 
 struct BaryCmp {
@@ -79,6 +65,8 @@ struct BaryCmp {
   }
 };
 
+// == Utilities
+
 void print_bary_point(std::vector<std::pair<int, int>> v) {
   std::cout << "{";
   for (auto p : v) {
@@ -86,6 +74,8 @@ void print_bary_point(std::vector<std::pair<int, int>> v) {
   }
   std::cout << "}\n";
 }
+
+// == Tool to get faces' vertices in a consistent order
 
 int argmin_index(std::vector<Vertex> P) {
   int min_index = P[0].getIndex();
@@ -111,7 +101,6 @@ std::vector<Vertex> shift_indices(std::vector<Vertex> P, int shifting) {
 }
 
 std::vector<Vertex> get_vertices(Face face) {
-  // Method to get vertices in consistent order for a face
   std::vector<Vertex> P;
   for (Vertex v : face.adjacentVertices()) {
     P.push_back(v);
@@ -120,8 +109,12 @@ std::vector<Vertex> get_vertices(Face face) {
   P = shift_indices(P, argmin);
   return P;
 }
+
+// == Implement the formulae for calculating the projection on the Bézier tile
+
 Vector3 get_point_position(std::vector<std::pair<int, int>> p, BezierTile B,
                            int lod) {
+  // Implement the formula for b at page 2, §2
   double u = (double)p[1].second / (lod + 1);
   double v = (double)p[2].second / (lod + 1);
   double w = (double)p[0].second / (lod + 1);
@@ -134,6 +127,7 @@ Vector3 get_point_position(std::vector<std::pair<int, int>> p, BezierTile B,
 }
 
 Vector3 get_normal(std::vector<std::pair<int, int>> p, BezierTile B, int lod) {
+  // Implement the formula for n at page 2, §2
   double u = (double)p[1].second / (lod + 1);
   double v = (double)p[2].second / (lod + 1);
   double w = (double)p[0].second / (lod + 1);
@@ -142,6 +136,9 @@ Vector3 get_normal(std::vector<std::pair<int, int>> p, BezierTile B, int lod) {
               u * v * B["n_011"] + v * w * B["n_101"];
   return N / dot(N, N);
 }
+
+// == Obj class
+
 class Obj {
 public:
   std::map<std::vector<std::pair<int, int>>, int, BaryCmp> index_vertices;
@@ -150,8 +147,8 @@ public:
   std::vector<Vector3> normals;
   std::vector<std::array<int, 3>> faces;
   Obj() { nb_points = 0; }
-  void add_vertex(std::vector<std::pair<int, int>> v, BezierTile B, int lod,
-                  Face f) {
+
+  void add_vertex(std::vector<std::pair<int, int>> v, BezierTile B, int lod) {
     auto it = index_vertices.find(v);
     if (it == index_vertices.end()) {
       index_vertices.insert({v, nb_points});
@@ -160,24 +157,27 @@ public:
       nb_points++;
     }
   }
+
   int get_index_or_assign(std::vector<std::pair<int, int>> v, BezierTile B,
-                          int lod, Face f) {
+                          int lod) {
     auto it = index_vertices.find(v);
     if (it == index_vertices.end()) {
-      add_vertex(v, B, lod, f);
+      add_vertex(v, B, lod);
       return nb_points - 1;
     } else {
       return it->second;
     }
   }
+
   void add_face(std::array<std::vector<std::pair<int, int>>, 3> f, BezierTile B,
-                int lod, Face face) {
+                int lod) {
     std::array<int, 3> new_f;
     for (int i = 0; i < 3; i++) {
-      new_f[i] = get_index_or_assign(f[i], B, lod, face);
+      new_f[i] = get_index_or_assign(f[i], B, lod);
     }
     faces.push_back(new_f);
   }
+
   void write_to_file(std::ofstream &file) {
     for (Vector3 v : vertices) {
       file << "v " << v.x << " " << v.y << " " << v.z << "\n";
@@ -195,7 +195,12 @@ public:
 
 // ## MAIN FUNCTIONS #########################
 
+// == Auxiliary function to help compute Bézier tile
+
 void add_normal_midedge(BezierTile B, Face face, int opposite_vertex) {
+  // Here we are computing n_ijk where i,j,k < 2
+  // opposite_vertex indicates which of i,j,k is 0
+  // The computation are retrieved from page 3, §3.3
   std::vector<Vertex> P = get_vertices(face);
   double v = dot((geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
                   geometry->vertexPositions[P[(opposite_vertex + 1) % 3]]),
@@ -226,7 +231,8 @@ BezierTile get_bezier_tile(Face face) {
   std::vector<Vertex> P = get_vertices(face);
   Vector3 V{0.0, 0.0, 0.0}; // barycenter of the face
   int max_id, min_id;
-  Vector3 E{0.0, 0.0, 0.0};
+  Vector3 E{0.0, 0.0,
+            0.0}; // barycenter of all control points except the center one
   for (int i = 0; i <= 3; i++) {
     for (int j = 0; j <= 3 - i; j++) {
       int k = 3 - i - j;
@@ -284,14 +290,18 @@ BezierTile get_bezier_tile(Face face) {
 
 std::vector<std::vector<std::pair<int, int>>> get_discretized_face(int lod,
                                                                    Face f) {
+  // Function to discretize a triangular face, the indexing is explained in
+  // section 4 of the report
+
   std::vector<Vertex> v_f = get_vertices(f);
   std::vector<std::vector<std::pair<int, int>>> positions;
-  for (int w = 0; w <= lod + 1; w++) {
-    for (int t = 0; t <= w; t++) {
+  for (int layer = 0; layer <= lod + 1; layer++) {
+    for (int t = 0; t <= layer;
+         t++) { // Indeed there is l+1 points points on the layer l
       std::vector<std::pair<int, int>> coord_bary(3);
 
-      coord_bary[0] = std::make_pair(v_f[0].getIndex(), lod + 1 - w);
-      coord_bary[1] = std::make_pair(v_f[1].getIndex(), w - t);
+      coord_bary[0] = std::make_pair(v_f[0].getIndex(), lod + 1 - layer);
+      coord_bary[1] = std::make_pair(v_f[1].getIndex(), layer - t);
       coord_bary[2] = std::make_pair(v_f[2].getIndex(), t);
       positions.push_back(coord_bary);
     }
@@ -300,28 +310,34 @@ std::vector<std::vector<std::pair<int, int>>> get_discretized_face(int lod,
 }
 
 void set_pn_triangle(Face face, int lod, Obj &obj) {
+  // Add the PN triangle of face to obj
   BezierTile B = get_bezier_tile(face);
+
+  // Retrieving the discretized points of the face according to the level of
+  // detail
   std::vector<std::vector<std::pair<int, int>>> discretized_face =
       get_discretized_face(lod, face);
 
   int start_layer, first_neighbor, second_neighbor;
 
-  for (int l = 0; l <= lod; l++) {
-    start_layer = (int)l * (l + 1) / 2;
-    for (int i = start_layer; i < start_layer + l + 1; i++) {
+  // Adding the faces, again this is well explained in section 4 of the report
+
+  for (int layer = 0; layer <= lod; layer++) {
+    start_layer = (int)layer * (layer + 1) / 2;
+    for (int i = start_layer; i < start_layer + layer + 1; i++) {
       // Adding triangle with both neighbors in next layer
-      first_neighbor = i + l + 1;
-      second_neighbor = i + l + 2;
+      first_neighbor = i + layer + 1;
+      second_neighbor = i + layer + 2;
       obj.add_face({discretized_face[i], discretized_face[first_neighbor],
                     discretized_face[second_neighbor]},
-                   B, lod, face);
+                   B, lod);
       // Adding triangle (if possible) with second neighbor in next layer
       // and next neighbor in same layer (might not exist)
       // i + 1 := next neighbor in the same layer
-      if (i + 1 < start_layer + l + 1) {
+      if (i + 1 < start_layer + layer + 1) {
         obj.add_face({discretized_face[i], discretized_face[second_neighbor],
                       discretized_face[i + 1]},
-                     B, lod, face);
+                     B, lod);
       }
     }
   }
@@ -344,18 +360,12 @@ int main(int argc, char **argv) {
 
   Obj obj;
 
-  // // Create output mesh
-  // meshOut = std::make_unique<ManifoldSurfaceMesh>();
-  // geometryOut = std::make_unique<VertexPositionGeometry>( *meshOut );
-
   geometry->requireFaceAreas(); // get area by using geometry->faceAreas[f]
                                 // where f is the face
   geometry
       ->requireFaceNormals(); // get normal by using geometry->faceNormals[f]
                               // where f is the face
   geometry->requireVertexNormals();
-
-  i_obj->addVertexVectorQuantity("Input normals", geometry->vertexNormals);
 
   int lod = 2;
 
@@ -367,8 +377,10 @@ int main(int argc, char **argv) {
   auto o_obj =
       polyscope::registerSurfaceMesh("Output obj", obj.vertices, obj.faces);
 
+  // Visualising the normals
   o_obj->addVertexVectorQuantity("Normals", obj.normals);
 
+  // Exporting obj in an obj file
   obj.write_to_file(MyFile);
 
   MyFile.close();
