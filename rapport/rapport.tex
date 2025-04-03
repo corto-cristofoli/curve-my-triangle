@@ -10,13 +10,15 @@
 \usepackage{graphicx}
 \graphicspath{ {./images} }
 
+\def\Cpp{C\texttt{++} }
+
 \title{Rapport CGDI}
 \author{Corto Cristofoli et Max Royer}
 
 
 \begin{document}
 \maketitle
-\tableofcontents
+% \tableofcontents
 
 
 
@@ -26,17 +28,31 @@ Il s'agit de la présentation de notre implémentation de l'article
 de recherche \textit{Curved PN triangle}, par Alex Vlachos, Jorg Peters,
 Chas Boyd et Jason L. Mitchell.
 
-L'idée de l'article est de présenter un algorithme de lissage de modèles 3D de
-basse résolution. Pour cela, l'idée est d'utiliser la méthode des « Curved PN
-triangles ».
+L'article présente un algorithme de lissage de modèles 3D de basse résolution.
+Pour cela, l'idée est d'utiliser la méthode des « Curved PN triangles ». Un
+modèle 3D de basse résolution n'a que peu de polygones et donc une alure
+nécessairement anguleuse. Pour le rendre plus organique un lissage est
+nécessaire : il faut rajouter un grand nombre de triangle afin de faire
+disparaitre ces angles. Ce rajout se fait algorithmiquement en suivant des
+surfaces de bézier triangulaires.
+
+Si l'article décrit l'algorithme de manière théorique, nous nous sommes penchés
+sur sa compréhension et son implémentation en \Cpp à l'aide de la
+bibliothèque \textbf{geometry-central}.
 
 
 \section{Principe de l'algorithme}
+Dans tout le rapport nous considérons qu'un modèle 3D est un ensemble de face
+triangulaires.
 
-\section{Indexation des sommets du modèle 3D}
-% Où tu peux expliquer comment fonctionne `geometry-central` avec uniquement la
+\section{Enjeux d'implémentation de \textit{Geometry Central}}
+% Où on explique comment fonctionne `geometry-central` avec uniquement la
 % possibilité d'ajouter des sommets à des faces (ou edges) ce qui fait
 % trianguler automatiquement. D'où l'importance de repartir de zero.
+% (je peux le faire ça)
+
+\section{Indexation des sommets du modèle 3D}
+% Où tu peux parler des unordered set et tout
 
 % TODO: pas oublier de produire des visuels !
 

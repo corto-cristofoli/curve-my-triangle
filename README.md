@@ -1,6 +1,6 @@
 # curve-my-triangle
-CGDI project with Max Royer based on the article *Curved PN Triangles* by Alex VLACHOS, Jörg PETERS, Chas BOYD
-and Jason L. MITCHELL.
+CGDI project of Corto Cristofoli and Max Royer based on the article *Curved PN 
+Triangles* by Alex VLACHOS, Jörg PETERS, Chas BOYD and Jason L. MITCHELL.
 
 ## How to compile
 - `cmake -B build` in the root folder
