@@ -1,6 +1,0 @@
-\babel@toc {french}{}\relax 
-\babel@toc {french}{}\relax 
-\contentsline {section}{\numberline {1}Introduction}{1}{}%
-\contentsline {section}{\numberline {2}Principe de l'algorithme}{1}{}%
-\contentsline {section}{\numberline {3}Enjeux d'implémentation de \textit {Geometry Central}}{1}{}%
-\contentsline {section}{\numberline {4}Indexation des sommets du modèle 3D}{1}{}%

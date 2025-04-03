@@ -8,3 +8,4 @@ imgui.ini
 *.aux
 *.log
 *.fdb_latexmk
+*.toc
