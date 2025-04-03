@@ -7,6 +7,9 @@
 \usepackage{hyphenat}
 \hyphenation{mate-mática recu-perar}
 
+\usepackage{graphicx}
+\graphicspath{ {./images} }
+
 \title{Rapport CGDI}
 \author{Corto Cristofoli et Max Royer}
 
@@ -17,16 +20,24 @@
 
 
 
-\section*{Introduction}
+\section{Introduction}
 Cet article est réalisé dans le cadre de notre cours de CGDI.
 Il s'agit de la présentation de notre implémentation de l'article
 de recherche \textit{Curved PN triangle}, par Alex Vlachos, Jorg Peters,
 Chas Boyd et Jason L. Mitchell.
 
-L'idée de l'article est de présenter un algorithme de lissage de modèles 3d de
+L'idée de l'article est de présenter un algorithme de lissage de modèles 3D de
 basse résolution. Pour cela, l'idée est d'utiliser la méthode des « Curved PN
 triangles ».
 
 
+\section{Principe de l'algorithme}
+
+\section{Indexation des sommets du modèle 3D}
+% Où tu peux expliquer comment fonctionne `geometry-central` avec uniquement la
+% possibilité d'ajouter des sommets à des faces (ou edges) ce qui fait
+% trianguler automatiquement. D'où l'importance de repartir de zero.
+
+% TODO: pas oublier de produire des visuels !
 
 \end{document}
