@@ -2,6 +2,8 @@
 \usepackage[a4paper, total={5.5in, 8in}]{geometry}
 \usepackage{csquotes}
 
+
+% \usepackage[width=17cm, height=25cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
 \usepackage[autolanguage]{numprint} % for the \nombre command
@@ -54,13 +56,6 @@ bibliothèque \textbf{geometry-central}.
 
 \section{Principe de l'algorithme}
 
-\begin{figure}[ht!]
-\centering
-    \includegraphics[width=0.4\linewidth]{lod}
-    \caption{Sous-triangulation en fonction du \texttt{lod} (de 0 à 5)}
-    \label{fig:lod}
-\end{figure}
-
 Dans tout le rapport nous considérons qu'un modèle 3D est un ensemble de face
 triangulaires. Il est facile de se ramener à ce cas ci en triangulant
 simplement les faces non triangulaires.
@@ -68,6 +63,77 @@ simplement les faces non triangulaires.
 L'algorithme vise à diviser chaque faces triangulaires en une multitude de plus
 petites faces,
 dépendant d'un facteur : le \textit{level of detail} ou \texttt{lod}.
+
+% TODO: inserer image de plusieurs modèles en fonction du lod
+\begin{figure}[H]
+\centering
+\begin{tabular}{ccccc}
+\scalebox{1}{
+\begin{tikzpicture}
+\draw (0,0)--(2,0) ;
+\draw (2,0)--(1,1.73);
+\draw (1,1.73)--(0,0);
+\end{tikzpicture}}&
+\scalebox{0.5}{
+\begin{tikzpicture}
+\draw (0,0)--(4,0) ;
+\draw (4,0)--(2,3.46);
+\draw (2,3.46)--(0,0);
+\draw (2,0)--(1,1.73);
+\draw (2,3.46)--(4,0);
+\draw (3,1.73)--(2,0);
+\draw (3,1.73)--(1,1.73);
+\end{tikzpicture}}&
+\scalebox{0.333}{
+\begin{tikzpicture}
+\draw (0,0)--(6,0) ;
+\draw (6,0)--(3,5.19);
+\draw (3,5.19)--(0,0);
+\draw (2,0)--(1,1.73);
+\draw (4,0)--(5,1.73);
+\draw (2,3.46)--(4,3.46);
+\draw (2,3.46)--(4,0);
+\draw (4,3.46)--(2,0);
+\draw (5,1.73)--(1,1.73);
+\end{tikzpicture}}&
+\scalebox{0.25}{
+\begin{tikzpicture}
+\draw (0,0)--(8,0) ;
+\draw (8,0)--(4,6.92);
+\draw (4,6.92)--(0,0);
+\draw (6,0)--(3,5.19);
+\draw (5,5.19)--(3,5.19);
+\draw (2,0)--(1,1.73);
+\draw (4,0)--(6,3.46);
+\draw (2,3.46)--(6,3.46);
+\draw (2,3.46)--(4,0);
+\draw (5,5.19)--(2,0);
+\draw (1,1.73)--(7,1.73);
+\draw (6,0)--(7,1.73);
+\end{tikzpicture}}&
+\scalebox{0.2}{
+\begin{tikzpicture}
+\draw (0,0)--(10,0) ;
+\draw (10,0)--(5,8.65);
+\draw (5,8.65)--(0,0);
+\draw (8,0)--(4,6.92);
+\draw (8,0)--(9,1.73);
+\draw (6,0)--(3,5.19);
+\draw (7,5.19)--(3,5.19);
+\draw (2,0)--(1,1.73);
+\draw (4,0)--(7,5.19);
+\draw (2,3.46)--(8,3.46);
+\draw (2,3.46)--(4,0);
+\draw (6,6.92)--(2,0);
+\draw (6,6.92)--(4,6.92);
+\draw (1,1.73)--(9,1.73);
+\draw (6,0)--(8,3.46);
+\end{tikzpicture}}\\
+0&1&2&3&4
+\end{tabular}
+    \caption{Sous-triangulation en fonction du \texttt{lod} (de 0 à 4)}
+    \label{fig:lod}
+\end{figure}
 
 Concrètement, le \texttt{lod} correspond au nombre de sommets à ajouter sur une
 arête du triangle d'origine (voir \ref{fig:lod}).
