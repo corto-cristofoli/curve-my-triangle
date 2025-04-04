@@ -35,13 +35,13 @@ typedef std::map<std::string, Vector3> BezierTile;
 
 bool custome_compare_pair(const std::pair<int, int> &p1,
                           const std::pair<int, int> &p2) {
-  // Comparator described in equation (1) in the report
+  // Comparator described in equation (2) in the report
   return p1.second > p2.second ||
          (p1.second == p2.second && p1.first > p2.first);
 }
 
 struct BaryCmp {
-  // Comparator depicted in Figure 5 in the report
+  // Comparator depicted in Figure 9 in the report
   bool operator()(const std::vector<std::pair<int, int>> &lhs,
                   const std::vector<std::pair<int, int>> &rhs) const {
     std::vector<std::pair<int, int>> lhs_sorted(3);
@@ -124,7 +124,7 @@ std::vector<Vertex> get_vertices(Face face) {
 
 Vector3 get_point_position(std::vector<std::pair<int, int>> p, BezierTile B,
                            int lod) {
-  // Implement the formula for b at page 2, §2
+  // Implement the formula for b at page 2 of the article, §2
   double u = (double)p[1].second / (lod + 1);
   double v = (double)p[2].second / (lod + 1);
   double w = (double)p[0].second / (lod + 1);
@@ -137,7 +137,7 @@ Vector3 get_point_position(std::vector<std::pair<int, int>> p, BezierTile B,
 }
 
 Vector3 get_normal(std::vector<std::pair<int, int>> p, BezierTile B, int lod) {
-  // Implement the formula for n at page 2, §2
+  // Implement the formula for n at page 2 of the article, §2
   double u = (double)p[1].second / (lod + 1);
   double v = (double)p[2].second / (lod + 1);
   double w = (double)p[0].second / (lod + 1);
@@ -217,7 +217,7 @@ public:
 void add_normal_midedge(BezierTile B, Face face, int opposite_vertex) {
   // Here we are computing n_ijk where i,j,k < 2
   // opposite_vertex indicates which of i,j,k is 0
-  // The computation are retrieved from page 3, §3.3
+  // The computation are retrieved from the article page 3, §3.3
   std::vector<Vertex> P = get_vertices(face);
   double v = dot((geometry->vertexPositions[P[(opposite_vertex + 2) % 3]] -
                   geometry->vertexPositions[P[(opposite_vertex + 1) % 3]]),
@@ -286,7 +286,8 @@ BezierTile get_bezier_tile(Face face) {
 
         Vector3 N = geometry->vertexNormals[P[max_id]];
         double w = dot(Pmin - Pmax, N);
-        Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
+        Vector3 b =
+            (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section in the article
         E += b;
         if (i != 0) {
           B.insert({std::to_string(i * 100 + j * 10 + k), b});
@@ -308,7 +309,7 @@ BezierTile get_bezier_tile(Face face) {
 std::vector<std::vector<std::pair<int, int>>> get_discretized_face(int lod,
                                                                    Face f) {
   // Function to discretize a triangular face, the indexing is explained in
-  // section 4 of the report
+  // section 5 of the report
 
   std::vector<Vertex> v_f = get_vertices(f);
   std::vector<std::vector<std::pair<int, int>>> positions;
@@ -370,6 +371,7 @@ void apply_pn_triangle_transformation(int lod, Obj &output_obj) {
 // == MAIN
 int main(int argc, char **argv) {
 
+  // Command line parsing
   CLI::App app{"curveMyTriangle"};
   std::string sourceObj;
   app.add_option("-s,--source", sourceObj, "Source object")
@@ -377,7 +379,7 @@ int main(int argc, char **argv) {
       ->check(CLI::ExistingFile);
   ;
   std::string outputObj = "output.obj";
-  app.add_option("-o,--output", outputObj, "Output image")->required();
+  app.add_option("-o,--output", outputObj, "Output object")->required();
   app.add_option("-a,--alpha", alpha, "Alpha");
   unsigned int lod = 1;
   app.add_option("-l,--lod", lod, "Level of detail");

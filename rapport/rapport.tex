@@ -10,7 +10,7 @@
 \usepackage{multicol}
 \usepackage{wrapfig}
 
-\usepackage{hyphenat, tikz, float, subcaption}
+\usepackage{hyphenat, tikz, float}
 \hyphenation{mate-mática recu-perar}
 
 \usepackage{graphicx}
@@ -25,7 +25,7 @@
 
 \def\Cpp{C\texttt{++} }
 
-\title{Rapport CGDI}
+\title{CURVE MY TRIANGLE\\ \large Rapport CGDI}
 \author{Corto Cristofoli et Max Royer}
 
 
@@ -34,6 +34,13 @@
 % \tableofcontents
 
 
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{cc}
+        \includegraphics[scale=0.129]{bunny\_no\_pn}&
+        \includegraphics[scale=0.129]{bunny\_pn\_8}
+    \end{tabular}
+\end{figure}
 
 \section{Introduction}
 Cet article est réalisé dans le cadre de notre cours de CGDI.
@@ -53,6 +60,8 @@ Si l'article décrit l'algorithme de manière théorique, nous nous sommes pench
 sur sa compréhension et son implémentation en \Cpp à l'aide de la
 bibliothèque \textbf{geometry-central}.
 
+
+\newpage
 
 \section{Principe de l'algorithme}
 
@@ -146,8 +155,10 @@ utilise une surface de Bézier triangulaire avec 10 points de contrôle. Les
 différents sommets des nouvelles faces seront ensuite placés de manière à
 suivre la surface de Bézier produite. Si l'on nomme $b_{ijk}$ avec $i+j+k = 3$
 et $i,j,k\geq 0$, alors la position d'un des points du triangle aux coordonnées
-barycentrique $(u,v)$ est définie dans l'espace par le patch de bézier $b$
-($w=1-u-v$) : $$b(u,v) = \sum_{i+j+k=3} b_{ijk} \frac{3!}{i!j!k!}u^i v^i w^i$$
+barycentrique $(u,v)$ est définie dans l'espace par le patch de bézier $b$:
+\begin{equation}
+    \textrm{Avec } w = 1 - u - v,\hspace{3pt} b(u,v) = \sum_{i+j+k=3} b_{ijk} \frac{3!}{i!j!k!}u^i v^i w^i
+\end{equation}
 
 Voyons maintenant comment calculer les différents $b_{ijk}$.
 
@@ -250,7 +261,7 @@ d'indexation de tous les nouveaux sommets à ajouter.
 
 \section{Indexation des sommets du modèle 3D}
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \begin{tikzpicture}
 \draw (0,0)--(5.19,3) node[black,above]{\texttt{6}}node[gray,right]{$P_{1}$};
@@ -269,10 +280,11 @@ d'indexation de tous les nouveaux sommets à ajouter.
 \draw[gray,dashed] (5.19,-3.5)--(5.19,-3.5)node[below]{Couche 3};
 \end{tikzpicture}
 \caption{Indexation de la triangulation d'une face pour un \texttt{lod} de 2}
+\label{fig:index}
 \end{figure}
 
-On numérote la discrétisation de la face de cette manière pour avoir facilement les nouvelles faces. En effet on remarque que pour un sommet $i$ dans une couche $c$, on a que ses deux voisins dans la couche $c+1$ sont les sommets $i+c+1$ et $i+c+2$. Cela permet de déduire rapidement les nouvelles faces à ajouter en disant que pour une discrétisation avec un \texttt{lod} $l$, on ajoute pour chaque sommets $i$ dans une couche $c$ avec $c\leq l$ la face $(i,i+c+1,i+c+2)$ et la face $(i,i+c+2,i+1)$ si $i+1$ est aussi dans la couche $c$ (\textit{i.e.} $i+1< \frac{(c+2)(c+1)}{2}$)
-\begin{figure}[H]
+On indexe la discrétisation de la face de la manière décrite dans la figure \ref{fig:index} pour avoir facilement les nouvelles faces. En effet on remarque que pour un sommet $i$ dans une couche $c$, on a que ses deux voisins dans la couche $c+1$ sont les sommets $i+c+1$ et $i+c+2$. Cela permet de déduire rapidement les nouvelles faces à ajouter en disant que pour une discrétisation avec un \texttt{lod} $l$, on ajoute pour chaque sommets $i$ dans une couche $c$ avec $c\leq l$ la face $(i,i+c+1,i+c+2)$ et la face $(i,i+c+2,i+1)$ si $i+1$ est aussi dans la couche $c$ (\textit{i.e.} $i+1< \frac{(c+2)(c+1)}{2}$) voir figure \ref{fig:face}.
+\begin{figure}
 \centering
 \begin{tikzpicture}
     \draw (0,0)--(5.19,3)node[black,right]{\texttt{j+1}};
@@ -291,6 +303,7 @@ On numérote la discrétisation de la face de cette manière pour avoir facileme
 \draw[gray,dashed] (1.73,-1.5)--(1.73,-3.5)node[below]{Couche \texttt{c}};
 \end{tikzpicture}
 \caption{Exemple de faces ajoutées pour un sommet \texttt{i} dans la couche \texttt{c} ainsi que le cas où \texttt{j} et \texttt{j+1} ne sont pas dans la même couche}
+\label{fig:face}
 \end{figure}
 
 Chaque sommets est alors identifié par ses coordonnées barycentriques en fonction de $(P_{0},P_{1},P_{2})$, étant donné que ces coordonnées sont rationnelles et sont en fait des multiples de $\frac{1}{\texttt{lod}+1}$ nous avons décider de garder des coordonnées entières pour identifier les sommets tout en gardant le \texttt{lod} lorqu'il s'agit de calculer la position du sommet dans la tuile de Bézier.
@@ -310,11 +323,10 @@ Ainsi un sommet est représenté par un \texttt{vector} de \texttt{pair(int,int)
 \label{fig:doublerepr}
 \end{figure}
 
-Ici le sommet $P$ peut être représenté par: $\left\{(P_{0},0),(P_{1},\frac{1}{2}),(P_{2},\frac{1}{2})\right\}$ mais aussi par $\left\{(P_{1},\frac{1}{2}),(P_{2},\frac{1}{2}),(P_{3},0)\right\}$. Au départ nous avons pensé naïvement à directement calculer la valeur du points dans la tuile de Bézier associé car lui pour le coup sera "le même" que pour les autres représentations. Malheureusement cette approche n'est pas concevable car les arrondis sur les \texttt{double} ne nous garantiraient pas que l'identification d'un point soit unique. Nous allons voir comment régler ce problème après avoir décris la classe \texttt{Obj}.
+Ici le sommet $P$ peut être représenté par: $\left\{(P_{0},0),(P_{1},\frac{1}{2}),(P_{2},\frac{1}{2})\right\}$ mais aussi par $\left\{(P_{1},\frac{1}{2}),(P_{2},\frac{1}{2}),(P_{3},0)\right\}$. Au départ nous avons pensé naïvement à directement calculer la valeur du points dans la tuile de Bézier associée car lui pour le coup sera "le même" que pour les autres représentations. Malheureusement cette approche n'est pas concevable car les arrondis sur les \texttt{double} ne nous garantiraient pas que l'identification d'un point soit unique. Nous allons voir comment régler ce problème après avoir décris la classe \texttt{Obj}.
 
-Pour recréer un nouvel objet nous avons créé une petite classe \texttt{Obj} ayant les primitives pour construire un tel objet. Le problème est qu'un point identique peut avoir plusieurs représentation possibles. Par exemple pour:
-
-\begin{figure}[H]
+Pour recréer un nouvel objet nous avons créé une petite classe \texttt{Obj} ayant les primitives pour construire un tel objet. Voir la figure \ref{fig:objClass} qui récapitule les champs et les méthodes de la dite classe: 
+\begin{figure}
 \centering
 \begin{tikzpicture}
 \draw
@@ -341,6 +353,7 @@ Pour recréer un nouvel objet nous avons créé une petite classe \texttt{Obj} a
 \draw (O) -- (w);
 \end{tikzpicture}
 \caption{Description de la classe \texttt{Obj}}
+\label{fig:objClass}
 \end{figure}
 
 Ici on a \texttt{Obj.index\_vertices : map<vector<pair<int,int>>,int>}, cela veut dire que l'on doit être capable d'ordonner les représentations des points en coordonnées barycentrique tout en conservant leur équivalence.
@@ -355,9 +368,8 @@ Pour cela nous effectuons d'abord un tri sur le \texttt{vector} des coordonnées
 Cela permet alors d'ordonné facilement les représentations triées en considérant l'ordre lexicographique sur la partie ou la représentation a des coordonnées strictement positives. Pour exemple reprenons les deux représentations de la figure \ref{fig:doublerepr}.
 \begin{figure}[H]
 \centering
-\begin{subfigure}{.49\textwidth}
-    \centering
-\scalebox{0.8}{
+\begin{tabular}{cc}
+\scalebox{0.6}{
   \begin{tikzpicture}
     \draw (-3,0)node[draw]{$\left\{(\texttt{0},0),(\texttt{1},\frac{1}{2}),(\texttt{2},\frac{1}{2})\right\}$};
     \draw (3,0)node[draw]{$\left\{(\texttt{1},\frac{1}{2}),(\texttt{2},\frac{1}{2}),(\texttt{3},0))\right\}$};
@@ -368,11 +380,8 @@ Cela permet alors d'ordonné facilement les représentations triées en considé
     \draw (-3,-4)node[draw]{$\left\{(\texttt{2},\frac{1}{2}),(\texttt{1},\frac{1}{2}))\right\}$};
     \draw (3,-4)node[draw]{$\left\{(\texttt{2},\frac{1}{2}),(\texttt{1},\frac{1}{2}))\right\}$};
     \draw (0,-4)node {=};
-\end{tikzpicture}}
-\end{subfigure}
-\begin{subfigure}{.49\textwidth}
-    \centering
-\scalebox{0.8}{
+\end{tikzpicture}}&\vline
+\scalebox{0.6}{
   \begin{tikzpicture}
     \draw (-3,0)node[draw]{$\left\{(\texttt{0},0),(\texttt{1},\frac{1}{2}),(\texttt{3},\frac{1}{2})\right\}$};
     \draw (3,0)node[draw]{$\left\{(\texttt{1},\frac{1}{2}),(\texttt{2},\frac{1}{2}),(\texttt{3},0))\right\}$};
@@ -383,11 +392,34 @@ Cela permet alors d'ordonné facilement les représentations triées en considé
     \draw (-3,-4)node[draw]{$\left\{(\texttt{3},\frac{1}{2}),(\texttt{1},\frac{1}{2}))\right\}$};
     \draw (3,-4)node[draw]{$\left\{(\texttt{2},\frac{1}{2}),(\texttt{1},\frac{1}{2}))\right\}$};
     \draw (0,-4)node {>};
-    \draw (-5.3,0)--(-5.3,-4);
 \end{tikzpicture}}
-\end{subfigure}
+\end{tabular}
 \caption{Exemples d'ordres sur des représentations}
 \end{figure}
 
-Ainsi on peut passer à la \texttt{map} la structure de comparaison adéquate pour savoir si on a déjà ajouté le point dans \texttt{Obj.vertices}.
+Ainsi on peut passer à la \texttt{map} la structure de comparaison adéquate pour savoir si on a déjà ajouté le point dans \texttt{Obj.vertices}. Cela permet ainsi d'avoir une identification unique des nombreuses représentations d'un point possible.
+
+\section{Résultats}
+
+Les résultats obtenus sont les suivants:
+
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{ccc}
+        \includegraphics[scale=0.083]{bunny\_no\_pn}&
+        \includegraphics[scale=0.105]{bunny\_pn\_2}&
+        \includegraphics[scale=0.083]{bunny\_pn\_8}\\
+        $\texttt{lod}=0$&$\texttt{lod}=2$&$\texttt{lod}=8$
+    \end{tabular}
+    \caption{Application de l'algorithme sur le fichier \texttt{bunny\_low\_poly} avec $\alpha=-\frac{1}{2}$}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{cc}
+        \includegraphics[scale=0.129]{tetra\_no\_pn}&
+        \includegraphics[scale=0.129]{tetra\_pn}\\
+        Avant&Après
+    \end{tabular}
+    \caption{Application de l'algorithme sur le fichier \texttt{tetrahedra} avec $\alpha=-\frac{1}{2}$ et $\texttt{lod}=4$}
+\end{figure}
 \end{document}
