@@ -12,3 +12,4 @@ imgui.ini
 tmp
 rapport/*.aux
 rapport/*.log
+.DS_Store

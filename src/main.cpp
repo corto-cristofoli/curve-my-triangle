@@ -144,7 +144,7 @@ Vector3 get_normal(std::vector<std::pair<int, int>> p, BezierTile B, int lod) {
   Vector3 N = std::pow(w, 3) * B["n_200"] + std::pow(u, 3) * B["n_020"] +
               std::pow(v, 3) * B["n_002"] + u * w * B["n_110"] +
               u * v * B["n_011"] + v * w * B["n_101"];
-  return N / dot(N, N);
+  return N / sqrt(dot(N, N));
 }
 
 // == Obj class
@@ -258,40 +258,41 @@ BezierTile get_bezier_tile(Face face) {
         add_normal_midedge(B, face, 0);
       } else if (j == 3) {
         B.insert({"030", geometry->vertexPositions[P[1]]});
-        B.insert({"n_020", geometry->vertexNormals[P[0]]});
+        B.insert({"n_020", geometry->vertexNormals[P[1]]});
         add_normal_midedge(B, face, 1);
       } else if (k == 3) {
         B.insert({"003", geometry->vertexPositions[P[2]]});
-        B.insert({"n_002", geometry->vertexNormals[P[0]]});
+        B.insert({"n_002", geometry->vertexNormals[P[2]]});
         add_normal_midedge(B, face, 2);
-      }
-      if (i == j) {
-        continue;
-      } else if (i == 1) {
-        min_id = 0;
-      } else if (j == 1) {
-        min_id = 1;
-      } else if (k == 1) {
-        min_id = 2;
-      }
-      if (i == 2) {
-        max_id = 0;
-      } else if (j == 2) {
-        max_id = 1;
-      } else if (k == 2) {
-        max_id = 2;
-      }
-      Vector3 Pmax = geometry->vertexPositions[P[max_id]];
-      Vector3 Pmin = geometry->vertexPositions[P[min_id]];
-
-      Vector3 N = geometry->vertexNormals[P[max_id]];
-      double w = dot(Pmin - Pmax, N);
-      Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
-      E += b;
-      if (i != 0) {
-        B.insert({std::to_string(i * 100 + j * 10 + k), b});
       } else {
-        B.insert({"0" + std::to_string(j * 10 + k), b});
+        if (i == j) {
+          continue;
+        } else if (i == 1) {
+          min_id = 0;
+        } else if (j == 1) {
+          min_id = 1;
+        } else if (k == 1) {
+          min_id = 2;
+        }
+        if (i == 2) {
+          max_id = 0;
+        } else if (j == 2) {
+          max_id = 1;
+        } else if (k == 2) {
+          max_id = 2;
+        }
+        Vector3 Pmax = geometry->vertexPositions[P[max_id]];
+        Vector3 Pmin = geometry->vertexPositions[P[min_id]];
+
+        Vector3 N = geometry->vertexNormals[P[max_id]];
+        double w = dot(Pmin - Pmax, N);
+        Vector3 b = (2 * Pmax + Pmin - w * N) / 3; // see 3.1 section
+        E += b;
+        if (i != 0) {
+          B.insert({std::to_string(i * 100 + j * 10 + k), b});
+        } else {
+          B.insert({"0" + std::to_string(j * 10 + k), b});
+        }
       }
     }
   }
