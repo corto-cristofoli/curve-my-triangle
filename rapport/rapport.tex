@@ -1,5 +1,6 @@
 \documentclass{article}
 \usepackage[a4paper, total={5.5in, 8in}]{geometry}
+\usepackage{csquotes}
 
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
@@ -41,7 +42,7 @@ Chas Boyd et Jason L. Mitchell.
 L'article présente un algorithme de lissage de modèles 3D de basse résolution.
 Pour cela, l'idée est d'utiliser la méthode des « Curved PN triangles ». Un
 modèle 3D de basse résolution n'a que peu de polygones et donc une alure
-nécessairement anguleuse. Pour le rendre plus organique un lissage est
+nécessairement anguleuse. Pour le rendre plus organique, un lissage est
 nécessaire : il faut rajouter un grand nombre de triangle afin de faire
 disparaître ces angles. Ce rajout se fait algorithmiquement en suivant des
 surfaces de Bézier triangulaires.
@@ -64,7 +65,8 @@ Dans tout le rapport nous considérons qu'un modèle 3D est un ensemble de face
 triangulaires. Il est facile de se ramener à ce cas ci en triangulant
 simplement les faces non triangulaires.
 
-L'algorithme vise à transformer chaque faces triangulaires en une multitude,
+L'algorithme vise à diviser chaque faces triangulaires en une multitude de plus
+petites faces,
 dépendant d'un facteur : le \textit{level of detail} ou \texttt{lod}.
 
 Concrètement, le \texttt{lod} correspond au nombre de sommets à ajouter sur une
@@ -142,15 +144,43 @@ plan de $N_1$}
 
 Pour chaque sommets, le vecteur normal induit un plan normal. On choisit donc
 de projeter chaque coefficient tangent dans le plan normal du sommet le plus
-proche (voir figure \ref{fig:tangent})
+proche (voir figure \ref{fig:tangent}). Il n'y a pas d’ambiguïté sur le sommet
+le plus proche puisque les arêtes sont divisées chacune en trois et non en
+deux.
 
 \subsection{Coefficient central}
+Pour le coefficient central, on effectue une translation jusqu'à la position
+$E=(b_{210} + b_{120} + b_{021} + b_{012} + b_{201} + b_{102})/6$ (c'est la
+moyenne de tous les coefficients tangents). Si l'on note $V=(P_1 + P_2 +
+P_3)/3$ la position de départ de $b_{111}$ on a donc effectué une translation
+de vecteur $E-V$. On ajoute ensuite la moitié de cette même translation.
+
+Au final on aura $b_{111} = E + \frac{1}{2}(E-V)$. Il est important de noter
+que ce choix de facteur $\frac{1}{2}$ est arbitraire et qu'on peut varier cette
+valeur. En effet la formule pour calculer la position de $b_{111}$ serait
+plutôt une formule du type $b_{111} = (1-\alpha)E + \alpha V$. Le choix d'un
+$\alpha = -\frac{1}{2}$ est expliqué plus amplement dans le papier.
+
 
 \section{Enjeux d'implémentation de \textit{Geometry Central}}
-% Où on explique comment fonctionne `geometry-central` avec uniquement la
-% possibilité d'ajouter des sommets à des faces (ou edges) ce qui fait
-% trianguler automatiquement. D'où l'importance de repartir de zero.
-% (je peux le faire ça)
+
+\textbf{Geometry Central} utilise une structure de « manifold surface meshes ».
+Il s'agit d'un ensemble de faces triangulaires orientées (vers l'extérieur).
+Cet objet est très strict sur la manière de le transformer car il faut pouvoir
+maintenir la structure d' \textit{halfedge} qui permet de naviguer à travers le
+modèle 3D. Cette contrainte permet une navigation très simple dans tout le
+modèle (via les sommets, les faces, les arêtes \textbf{ou} les
+\textit{halfedges}) mais rend impossible l'ajout d'un simple point de manière
+arbitraire. La seule manière d'ajouter un point est de l'ajouter à une arête ou
+à une face, conduisant à une triangulation par ce point. Comme nous souhaitons
+ajouter de toutes nouvelles faces pour remplacer une ancienne face il faudrait
+pouvoir supprimer cette ancienne face, ce qui n'est pas faisable directement si
+ça n'est pas une face sur un bord du modèle.
+
+Il est donc plus simple de reconstruire le modèle depuis zero. Un axe
+d'amélioration de notre projet serait donc de réussir à réaliser ces opérations
+« en place ». Dans la partie suivante nous expliquons comment gérer le soucis
+d'indexation de tous les nouveaux sommets à ajouter.
 
 \section{Indexation des sommets du modèle 3D}
 
