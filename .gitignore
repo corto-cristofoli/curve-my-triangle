@@ -10,3 +10,5 @@ imgui.ini
 *.fdb_latexmk
 *.toc
 tmp
+rapport/*.aux
+rapport/*.log

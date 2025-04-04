@@ -1,10 +1,11 @@
 \documentclass{article}
+\usepackage[a4paper, total={5.5in, 8in}]{geometry}
 
-
-\usepackage[width=17cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
 \usepackage[autolanguage]{numprint} % for the \nombre command
+\usepackage{multicol}
+\usepackage{wrapfig}
 
 \usepackage{hyphenat, tikz, float, subcaption}
 \hyphenation{mate-mática recu-perar}
@@ -15,6 +16,9 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \captionsetup{position=below}
+
+\sloppy % pour pas que ça dépasse
+\newtheorem{definition}{Définition}
 
 \def\Cpp{C\texttt{++} }
 
@@ -48,6 +52,14 @@ bibliothèque \textbf{geometry-central}.
 
 
 \section{Principe de l'algorithme}
+
+\begin{figure}[ht!]
+\centering
+    \includegraphics[width=0.4\linewidth]{lod}
+    \caption{Sous-triangulation en fonction du \texttt{lod} (de 0 à 5)}
+    \label{fig:lod}
+\end{figure}
+
 Dans tout le rapport nous considérons qu'un modèle 3D est un ensemble de face
 triangulaires. Il est facile de se ramener à ce cas ci en triangulant
 simplement les faces non triangulaires.
@@ -55,18 +67,84 @@ simplement les faces non triangulaires.
 L'algorithme vise à transformer chaque faces triangulaires en une multitude,
 dépendant d'un facteur : le \textit{level of detail} ou \texttt{lod}.
 
-% TODO: inserer image de plusieurs modèles en fonction du lod
-\begin{figure}[ht!]
-\centering
-    \includegraphics[width=0.6\textwidth]{lod}
-    \caption{Sous-triangulation en fonction du \texttt{lod} (de 0 à 5)}
-    \label{fig:lod}
-\end{figure}
-
 Concrètement, le \texttt{lod} correspond au nombre de sommets à ajouter sur une
 arête du triangle d'origine (voir \ref{fig:lod}).
 
+% TODO: expliquer pourquoi ce choix du nombre de points de contrôle
+Une fois la subdivision faites pour chaque face (on verra plus tard que cette
+subdivision pose des soucis d'implémentation), il faut moduler la position des
+nouveaux sommets afin de parvenir à un lissage convainquant. Pour se faire, on
+utilise une surface de Bézier triangulaire avec 10 points de contrôle. Les
+différents sommets des nouvelles faces seront ensuite placés de manière à
+suivre la surface de Bézier produite. Si l'on nomme $b_{ijk}$ avec $i+j+k = 3$
+et $i,j,k\geq 0$, alors la position d'un des points du triangle aux coordonnées
+barycentrique $(u,v)$ est définie dans l'espace par le patch de bézier $b$
+($w=1-u-v$) : $$b(u,v) = \sum_{i+j+k=3} b_{ijk} \frac{3!}{i!j!k!}u^i v^i w^i$$
 
+Voyons maintenant comment calculer les différents $b_{ijk}$.
+
+\section{Calcul des points de contrôle du patch de Bézier}
+
+\begin{figure}[ht!]
+\centering
+    \includegraphics[width=0.4\linewidth]{control-points}
+    \caption{Points/coefficients de contrôle d'un patch de Bézier triangulaire}
+    \label{fig:control-points}
+\end{figure}
+
+En s'appuyant sur la figure \ref{fig:control-points}, on peut distinguer 3
+catégories de coefficients:
+
+\begin{itemize}
+    \item \textit{coefficients de sommets} : $b_{300}, b_{030}, b_{003}$
+    \item \textit{coefficients tangents} : $b_{210}, b_{201}, b_{120},
+b_{021}, b_{102}, b_{012}$
+    \item \textit{coefficient central} : $b_{111}$
+\end{itemize}
+
+\subsection{Coefficients de sommets}
+Afin de conserver la forme primaire du modèle, les sommets originaux ne change
+pas de position dans l'espace : la position des coefficients de sommets est
+donc la même que celle de leur sommet respectif (si l'on applique $b$ à
+$(1,0)$, $(0,1)$ ou $(0,0)$ on voit bien que les positions sont respectivement
+$b_{300}$, $b_{030}$ ou $b_{003}$).
+
+\subsection{Coefficients tangents}
+Afin de calculer les coefficients tangents introduisons la notion de normale à
+un point.
+
+\begin{definition}{Vecteur normal à un point}
+
+Les modèles 3D que nous étudions sont des modèles orientés, c'est-à-dire que
+chaque face du modèle est définie par un unique vecteur unitaire, normal à la
+surface et orienté vers l'extérieur du modèle.
+
+Soit $s$ un sommet du modèle et $f_a,f_b,f_c$ les faces auxquelles il
+appartient (si il y a un bord cela ne change pas grand chose). Le vecteur
+normal au sommet $s$ est la moyenne des vecteurs normaux de chaques faces :
+$N_s = \frac{N_a + N_b + N_c}{||N_a + N_b + N_c||}$.
+\end{definition}
+
+\begin{figure}[ht!]
+\centering
+    \includegraphics[width=0.4\linewidth]{normals}
+    \caption{Données en entrée : points $P_i$ et leur normale $N_i$}
+    \label{fig:normals}
+\end{figure}
+
+\begin{figure}[ht!]
+\centering
+    \includegraphics[width=0.4\linewidth]{tangent}
+    \caption{Construction du coefficient tangent $b_210$ en projettant dans le
+plan de $N_1$}
+    \label{fig:tangent}
+\end{figure}
+
+Pour chaque sommets, le vecteur normal induit un plan normal. On choisit donc
+de projeter chaque coefficient tangent dans le plan normal du sommet le plus
+proche (voir figure \ref{fig:tangent})
+
+\subsection{Coefficient central}
 
 \section{Enjeux d'implémentation de \textit{Geometry Central}}
 % Où on explique comment fonctionne `geometry-central` avec uniquement la
