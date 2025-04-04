@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+#include <CLI11.hpp>
+
 double alpha = 1;
 
 // == Geometry-central data
@@ -357,16 +359,36 @@ void set_pn_triangle(Face face, int lod, Obj &obj) {
   }
 }
 
+void apply_pn_triangle_transformation(int lod, Obj &output_obj) {
+  // Apply the transformation on all the surface mesh
+  for (auto face : mesh->faces()) {
+    set_pn_triangle(face, lod, output_obj);
+  }
+}
+
 // == MAIN
 int main(int argc, char **argv) {
+
+  CLI::App app{"curveMyTriangle"};
+  std::string sourceObj;
+  app.add_option("-s,--source", sourceObj, "Source object")
+      ->required()
+      ->check(CLI::ExistingFile);
+  ;
+  std::string outputObj = "output.obj";
+  app.add_option("-o,--output", outputObj, "Output image")->required();
+  app.add_option("-a,--alpha", alpha, "Alpha");
+  unsigned int lod = 1;
+  app.add_option("-l,--lod", lod, "Level of detail");
+  CLI11_PARSE(app, argc, argv);
 
   // Initialize polyscope
   polyscope::init();
 
   // Load input mesh
-  std::tie(mesh, geometry) = readManifoldSurfaceMesh(argv[1]);
+  std::tie(mesh, geometry) = readManifoldSurfaceMesh(sourceObj);
 
-  std::ofstream MyFile("output.obj");
+  std::ofstream MyFile(outputObj);
 
   auto i_obj = polyscope::registerSurfaceMesh(
       "Input obj", geometry->inputVertexPositions, mesh->getFaceVertexList(),
@@ -377,11 +399,8 @@ int main(int argc, char **argv) {
   geometry->requireVertexNormals();
 
   Obj obj;
-  int lod = 2;
 
-  for (auto face : mesh->faces()) {
-    set_pn_triangle(face, lod, obj);
-  }
+  apply_pn_triangle_transformation(lod, obj);
 
   // Register the mesh with polyscope
   auto o_obj =

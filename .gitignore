@@ -9,3 +9,4 @@ imgui.ini
 *.log
 *.fdb_latexmk
 *.toc
+tmp
