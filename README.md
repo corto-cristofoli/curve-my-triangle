@@ -2,7 +2,7 @@
 CGDI project of Corto Cristofoli and Max Royer based on the article *Curved PN 
 Triangles* by Alex VLACHOS, Jörg PETERS, Chas BOYD and Jason L. MITCHELL.
 
-Voir le [git](https://github.com/corto-cristofoli/curve-my-triangle)
+See the [git](https://github.com/corto-cristofoli/curve-my-triangle)
 
 ## Goal
 The idea of the project is to take a 3d *lowpoly* mesh and to apply a technique 
